@@ -183,30 +183,6 @@ Interactive API documentation is available once the server is running:
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! 🚀
-
-1. Fork the repository
-2. Create a feature branch
-
-   ```bash
-   git checkout -b feature/NewFeature
-   ```
-3. Commit your changes
-
-   ```bash
-   git commit -m "Add NewFeature"
-   ```
-4. Push to the branch
-
-   ```bash
-   git push origin feature/NewFeature
-   ```
-5. Open a Pull Request
-
----
-
 ## 📝 License
 
 This project is open-source and licensed under the **MIT License**.
