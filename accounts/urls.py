@@ -1,28 +1,47 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
-    UserViewSet, RegisterView, LoginView, 
-    UserProfileView, ChangePasswordView, UserDeviceViewSet
+    AuthView, UserViewSet, UserTechView, CheckEmailView
 )
 
-# Initialize Router for ViewSets
+# Router for standard CRUD on Users
+# Node: router.get('/', ...), router.put('/:id', ...)
 router = DefaultRouter()
-router.register(r'users', UserViewSet)
-router.register(r'devices', UserDeviceViewSet, basename='devices')
+router.register(r'users', UserViewSet, basename='users')
 
 urlpatterns = [
-    # Router URLs (Users CRUD & Devices)
-    path('', include(router.urls)),
+    # ==========================================
+    # AUTH ROUTES (Matches authRoutes.js)
+    # Prefix: /api/auth/ (Assuming you include this file under 'api/')
+    # ==========================================
+    path('auth/register', AuthView.as_view({'post': 'register'}), name='register'),
+    path('auth/login', AuthView.as_view({'post': 'login'}), name='login'),
+    path('auth/me', AuthView.as_view({'get': 'get_me'}), name='get_me'),
+    path('auth/profile', AuthView.as_view({'put': 'update_profile'}), name='update_profile'),
+    path('auth/change-password', AuthView.as_view({'put': 'change_password'}), name='change_password'),
 
-    # Authentication Endpoints
-    path('register/', RegisterView.as_view(), name='register'),
-    path('login/', LoginView.as_view(), name='login'),
+    # ==========================================
+    # USER ROUTES (Matches userRoutes.js)
+    # Prefix: /api/users/
+    # ==========================================
     
-    # JWT Refresh Endpoint (Get new Access Token using Refresh Token)
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # 1. Tech Route (Must come before router to avoid ID conflict)
+    # Node: router.get('/tech', userController.getTechRoleUsers);
+    path('users/tech', UserTechView.as_view(), name='tech_users'),
 
-    # Profile & Password
-    path('me/', UserProfileView.as_view(), name='profile'),
-    path('change-password/', ChangePasswordView.as_view(), name='change-password'),
+    # 2. Check Email Route
+    # Node: router.get('/check-email/:email', ...);
+    path('users/check-email/<str:email>', CheckEmailView.as_view(), name='check_email'),
+
+    # 3. Bulk Status
+    # Node: router.patch('/bulk-status', ...);
+    path('users/bulk-status', UserViewSet.as_view({'patch': 'bulk_status'}), name='bulk_status'),
+    
+    # 4. Toggle Status (Specific ID)
+    # Node: router.patch('/:id/toggle-status', ...);
+    path('users/<str:pk>/toggle-status', UserViewSet.as_view({'patch': 'toggle_status'}), name='toggle_status'),
+
+    # 5. Standard CRUD (Get All, Get By ID, Create, Update, Delete)
+    # Node: router.get('/', ...), router.post('/', ...), router.delete('/:id', ...)
+    path('', include(router.urls)),
 ]
