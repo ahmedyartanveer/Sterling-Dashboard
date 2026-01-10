@@ -1,8 +1,3 @@
-নিচে তোমার দেওয়া কনটেন্টটি **professional, clean এবং GitHub-ready `README.md` format**-এ সাজিয়ে লিখে দিলাম। তুমি সরাসরি কপি করে `README.md` ফাইলে পেস্ট করতে পারো ✅
-
----
-
-````md
 # 🚀 Sterling Dashboard API
 
 Sterling Dashboard API is a comprehensive backend solution designed to streamline operations for **Managers** and **Technicians**.  
