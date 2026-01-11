@@ -103,9 +103,9 @@ Update the `.env` file with your local credentials:
 
 ```env
 # Security
-SECRET_KEY=your_secret_key_here
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=http://localhost:3000
 
 # Database
 DB_ENGINE=django.db.backends.mysql
