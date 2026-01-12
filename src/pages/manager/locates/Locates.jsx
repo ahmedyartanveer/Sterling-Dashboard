@@ -34,9 +34,7 @@ import {
     Email,
     Person,
     Tag,
-    Edit,
     Close,
-    Add,
     Delete,
     Search,
 } from '@mui/icons-material';
@@ -52,6 +50,15 @@ import {
     addDays,
 } from 'date-fns';
 import StyledTextField from '../../../components/ui/StyledTextField';
+import GradientButton from '../../../components/ui/GradientButton';
+import OutlineButton from '../../../components/ui/OutlineButton';
+
+// ── Constants ──
+const TEXT_COLOR = '#0F1115';
+const BLUE_COLOR = '#1976d2';
+const GREEN_COLOR = '#10b981';
+const RED_COLOR = '#ef4444';
+const ORANGE_COLOR = '#ed6c02';
 
 // ── Utility function ──
 const formatDate = (dateString) => {
@@ -106,13 +113,6 @@ const getBusinessDaysRemaining = (endDate) => {
 
     return { days: businessDays, expired: false };
 };
-
-const BLUE_COLOR = '#1976d2';
-const BLUE_DARK = '#1565c0';
-const GREEN_COLOR = '#2e7d32';
-const RED_COLOR = '#d32f2f';
-const ORANGE_COLOR = '#ed6c02';
-const PURPLE_COLOR = '#9c27b0';
 
 const parseDashboardAddress = (fullAddress) => {
     if (!fullAddress) return { street: '', city: '', state: '', zip: '', original: '' };
@@ -176,6 +176,7 @@ const Locates = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showOnlyUntagged, setShowOnlyUntagged] = useState(false);
 
+    // Snackbar state
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: '',
@@ -200,6 +201,7 @@ const Locates = () => {
         },
         staleTime: 3 * 60 * 1000,
     });
+    
 
     // ── Mutations ──
     const invalidateAndRefetch = () => {
@@ -322,7 +324,7 @@ const Locates = () => {
                 let completionDate = null;
                 let timeRemainingText = '';
                 let timeRemainingDetail = '';
-                let timeRemainingColor = 'inherit';
+                let timeRemainingColor = TEXT_COLOR;
                 let isExpired = false;
 
                 // Extract called by information
@@ -457,6 +459,13 @@ const Locates = () => {
         setSnackbar({ open: true, message, severity });
     };
 
+    const handleCloseSnackbar = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbar(prev => ({ ...prev, open: false }));
+    };
+
     const handleMarkCalled = (id, callType) => {
         markCalledMutation.mutate({ id, callType });
     };
@@ -563,19 +572,20 @@ const Locates = () => {
         <Box>
             {/* Header */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                <Typography
-                    sx={{
-                        fontWeight: 'bold',
-                        mb: 0.5,
-                        fontSize: 20,
-                        background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE_COLOR} 100%)`,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                    }}
-                >
-                    Locate Management
-                </Typography>
+                <Box>
+                    <Typography
+                        sx={{
+                            fontWeight: 500,
+                            fontSize: 20,
+                            color: TEXT_COLOR,
+                        }}
+                    >
+                        Locate Management
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Dispatch and monitor locate requests efficiently
+                    </Typography>
+                </Box>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                     <Button
                         variant="contained"
@@ -624,19 +634,13 @@ const Locates = () => {
                             sx={{ width: 200 }}
                         />
                         {selectedExcavator.size > 0 && (
-                            <Button
+                            <GradientButton
                                 variant="contained"
-                                startIcon={<Tag />}
                                 onClick={openBulkTagDialog}
                                 size="small"
-                                sx={{
-                                    bgcolor: PURPLE_COLOR,
-                                    '&:hover': { bgcolor: alpha(PURPLE_COLOR, 0.9) },
-                                    textTransform: 'none'
-                                }}
                             >
                                 Tag Selected ({selectedExcavator.size})
-                            </Button>
+                            </GradientButton>
                         )}
                     </Stack>
                 }
@@ -698,8 +702,16 @@ const Locates = () => {
                 onClose={() => setDeleteDialogOpen(false)}
                 maxWidth="sm"
                 fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: 'white'
+                    }
+                }}
             >
-                <DialogTitle sx={{ borderBottom: `1px solid ${alpha(RED_COLOR, 0.2)}` }}>
+                <DialogTitle sx={{
+                    borderBottom: `1px solid ${alpha(RED_COLOR, 0.2)}`,
+                    color: TEXT_COLOR
+                }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Delete color="error" />
                         <Typography variant="h6" color="error">
@@ -708,17 +720,17 @@ const Locates = () => {
                     </Box>
                 </DialogTitle>
                 <DialogContent sx={{ pt: 3 }}>
-                    <DialogContentText>
+                    <DialogContentText sx={{ color: TEXT_COLOR }}>
                         Are you sure you want to delete <strong>{selectedForDeletion.size} item(s)</strong> from the <strong>{deletionSection}</strong> section?
                     </DialogContentText>
-                    <Alert severity="warning" sx={{ mt: 2 }}>
+                    <Alert severity="warning" sx={{ mt: 2, bgcolor: '#fff3cd', color: TEXT_COLOR }}>
                         This action cannot be undone. All selected work orders will be permanently removed from the system.
                     </Alert>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
                     <Button
                         onClick={() => setDeleteDialogOpen(false)}
-                        sx={{ textTransform: 'none' }}
+                        sx={{ textTransform: 'none', color: TEXT_COLOR }}
                     >
                         Cancel
                     </Button>
@@ -736,23 +748,32 @@ const Locates = () => {
             </Dialog>
 
             {/* Tag Dialog */}
-            <Dialog open={tagDialogOpen} onClose={() => setTagDialogOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>
+            <Dialog
+                open={tagDialogOpen}
+                onClose={() => setTagDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: 'white'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ color: TEXT_COLOR }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
-                        <Tag color="primary" />
-                        <Typography variant="h6">Tag as Locates Needed</Typography>
+                        <Typography variant="h6" color={TEXT_COLOR}>Tag as Locates Needed</Typography>
                     </Stack>
                 </DialogTitle>
                 <DialogContent>
                     <Stack spacing={3} sx={{ mt: 2 }}>
                         <Box>
-                            <Typography variant="subtitle2" gutterBottom>
+                            <Typography variant="subtitle2" gutterBottom sx={{ color: TEXT_COLOR }}>
                                 Work Order
                             </Typography>
-                            <Typography variant="body1" fontWeight="bold">
+                            <Typography variant="body1" fontWeight="bold" sx={{ color: TEXT_COLOR }}>
                                 {selectedForTagging[0]?.workOrderNumber || 'N/A'}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                                 {selectedForTagging[0]?.customerName} • {selectedForTagging[0]?.street}
                             </Typography>
                         </Box>
@@ -796,42 +817,55 @@ const Locates = () => {
                     </Stack>
                 </DialogContent>
                 <DialogActions>
-                    <Button
+                    <OutlineButton
                         onClick={() => setTagDialogOpen(false)}
-                        sx={{ textTransform: 'none' }}
                     >
                         Cancel
-                    </Button>
-                    <Button
+                    </OutlineButton>
+                    <GradientButton
                         onClick={handleTagSubmit}
-                        variant="contained"
                         disabled={!tagForm.name.trim() || !tagForm.email.trim() || tagLocatesNeededMutation.isPending}
-                        startIcon={<Tag />}
-                        sx={{ bgcolor: PURPLE_COLOR, textTransform: 'none' }}
                     >
                         {tagLocatesNeededMutation.isPending ? 'Tagging...' : 'Tag Work Order'}
-                    </Button>
+                    </GradientButton>
                 </DialogActions>
             </Dialog>
 
             {/* Bulk Tag Dialog */}
-            <Dialog open={bulkTagDialogOpen} onClose={() => setBulkTagDialogOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>
+            <Dialog
+                open={bulkTagDialogOpen}
+                onClose={() => setBulkTagDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: 'white'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ color: TEXT_COLOR }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
                         <Tag color="primary" />
-                        <Typography variant="h6">Bulk Tag as Locates Needed</Typography>
+                        <Typography variant="h6" color={TEXT_COLOR}>Bulk Tag as Locates Needed</Typography>
                         <Chip label={`${selectedForTagging.length} items`} size="small" color="primary" />
                     </Stack>
                 </DialogTitle>
                 <DialogContent>
                     <Stack spacing={3} sx={{ mt: 2 }}>
                         <Box>
-                            <Typography variant="subtitle2" gutterBottom>
+                            <Typography variant="subtitle2" gutterBottom sx={{ color: TEXT_COLOR }}>
                                 Selected Work Orders
                             </Typography>
-                            <Box sx={{ maxHeight: 150, overflow: 'auto', border: '1px solid #ddd', p: 1, borderRadius: 1 }}>
+                            <Box sx={{
+                                maxHeight: 150,
+                                overflow: 'auto',
+                                border: '1px solid #ddd',
+                                p: 1,
+                                borderRadius: 1,
+                                bgcolor: 'white'
+                            }}>
                                 {selectedForTagging.map((item, index) => (
-                                    <Typography key={index} variant="body2" sx={{ py: 0.5 }}>
+                                    <Typography key={index} variant="body2" sx={{ py: 0.5, color: TEXT_COLOR }}>
                                         • {item.workOrderNumber}: {item.customerName}
                                     </Typography>
                                 ))}
@@ -879,31 +913,44 @@ const Locates = () => {
                 <DialogActions>
                     <Button
                         onClick={() => setBulkTagDialogOpen(false)}
-                        sx={{ textTransform: 'none' }}
+                        sx={{ textTransform: 'none', color: TEXT_COLOR }}
                     >
                         Cancel
                     </Button>
-                    <Button
+                    <GradientButton
                         onClick={handleTagSubmit}
-                        variant="contained"
                         disabled={!tagForm.name.trim() || !tagForm.email.trim() || bulkTagLocatesNeededMutation.isPending}
                         startIcon={<Tag />}
-                        sx={{ bgcolor: PURPLE_COLOR, textTransform: 'none' }}
                     >
                         {bulkTagLocatesNeededMutation.isPending ? 'Tagging...' : `Tag ${selectedForTagging.length} Items`}
-                    </Button>
+                    </GradientButton>
                 </DialogActions>
             </Dialog>
 
-            {/* Snackbar */}
+            {/* Snackbar (MUI Alert) */}
             <Snackbar
                 open={snackbar.open}
-                autoHideDuration={5000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                autoHideDuration={3000}
+                onClose={handleCloseSnackbar}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
-                <Alert severity={snackbar.severity} variant="filled">
-                    {snackbar.message}
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    sx={{
+                        width: '100%',
+                        borderRadius: 2,
+                        backgroundColor: snackbar.severity === 'success' 
+                            ? alpha(GREEN_COLOR, 0.05) 
+                            : alpha(RED_COLOR, 0.05),
+                        borderLeft: `4px solid ${snackbar.severity === 'success' ? GREEN_COLOR : RED_COLOR}`,
+                        '& .MuiAlert-icon': {
+                            color: snackbar.severity === 'success' ? GREEN_COLOR : RED_COLOR,
+                        },
+                    }}
+                    elevation={6}
+                >
+                    <Typography fontWeight={500}>{snackbar.message}</Typography>
                 </Alert>
             </Snackbar>
         </Box>
@@ -928,12 +975,13 @@ const Section = ({
             borderRadius: 2,
             overflow: 'hidden',
             border: `1px solid ${alpha(color, 0.3)}`,
+            bgcolor: 'white'
         }}
     >
         <Box
             sx={{
                 p: 1.2,
-                bgcolor: alpha(color, 0.08),
+                bgcolor: 'white',
                 borderBottom: `3px solid ${color}`,
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -942,15 +990,23 @@ const Section = ({
         >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Typography
-                    sx={{ fontSize: '1rem' }}
-                    fontWeight={600} color={color}>
+                    sx={{ fontSize: '1rem', color: TEXT_COLOR }}
+                    fontWeight={600}>
                     {title}
-                    <Chip size="small" label={count} sx={{ ml: 1 }} />
+                    <Chip
+                        size="small"
+                        label={count}
+                        sx={{
+                            ml: 1,
+                            bgcolor: alpha(color, 0.1),
+                            color: TEXT_COLOR
+                        }}
+                    />
                 </Typography>
                 {showTimer && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Timer fontSize="small" />
-                        <Typography variant="body2" color="text.secondary">
+                        <Timer fontSize="small" sx={{ color: TEXT_COLOR, opacity: 0.7 }} />
+                        <Typography variant="body2" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                             Real-time countdown active
                         </Typography>
                     </Box>
@@ -995,16 +1051,16 @@ const LocateTable = ({
         <Table size="small">
             <TableHead>
                 <TableRow sx={{ bgcolor: alpha(color, 0.06) }}>
-                    <TableCell padding="checkbox" width={50}>Select</TableCell>
-                    {showCallAction && <TableCell width={220}>Call Action</TableCell>}
-                    {showTagAction && <TableCell width={100}>Tag</TableCell>}
-                    {showTimerColumn && <TableCell width={180}>Time Remaining</TableCell>}
-                    <TableCell>Customer</TableCell>
-                    <TableCell>Address</TableCell>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Technician</TableCell>
-                    {showCalledBy && <TableCell width={200}>Called By</TableCell>}
-                    {showTaggedBy && <TableCell width={200}>Tagged By</TableCell>}
+                    <TableCell padding="checkbox" width={50} sx={{ color: TEXT_COLOR }}>Select</TableCell>
+                    {showCallAction && <TableCell width={220} sx={{ color: TEXT_COLOR }}>Call Action</TableCell>}
+                    {showTagAction && <TableCell width={100} sx={{ color: TEXT_COLOR }}>Tag</TableCell>}
+                    {showTimerColumn && <TableCell width={180} sx={{ color: TEXT_COLOR }}>Time Remaining</TableCell>}
+                    <TableCell sx={{ color: TEXT_COLOR }}>Customer</TableCell>
+                    <TableCell sx={{ color: TEXT_COLOR }}>Address</TableCell>
+                    <TableCell sx={{ color: TEXT_COLOR }}>Date</TableCell>
+                    <TableCell sx={{ color: TEXT_COLOR }}>Technician</TableCell>
+                    {showCalledBy && <TableCell width={200} sx={{ color: TEXT_COLOR }}>Called By</TableCell>}
+                    {showTaggedBy && <TableCell width={200} sx={{ color: TEXT_COLOR }}>Tagged By</TableCell>}
                 </TableRow>
             </TableHead>
             <TableBody>
@@ -1019,7 +1075,7 @@ const LocateTable = ({
                             (showCalledBy ? 1 : 0) +
                             (showTaggedBy ? 1 : 0)
                         } align="center" sx={{ py: 8 }}>
-                            <Typography color="text.secondary">No records found</Typography>
+                            <Typography sx={{ color: TEXT_COLOR, opacity: 0.7 }}>No records found</Typography>
                         </TableCell>
                     </TableRow>
                 ) : (
@@ -1028,15 +1084,13 @@ const LocateTable = ({
                         const addressLine = item.street || item.original || '—';
                         const location = [item.city, item.state, item.zip].filter(Boolean).join(', ');
                         const hasCheckmark = item.locatesCalled && item.calledByName;
-                        const isManuallyTagged = item.manuallyTagged;
 
                         return (
                             <TableRow
                                 key={item.id}
                                 hover
                                 sx={{
-                                    bgcolor: isSelected ? alpha(color, 0.1) : 'inherit',
-                                    borderLeft: isManuallyTagged ? `4px solid ${PURPLE_COLOR}` : 'none'
+                                    bgcolor: isSelected ? alpha(color, 0.1) : 'white',
                                 }}
                             >
                                 <TableCell padding="checkbox">
@@ -1044,6 +1098,7 @@ const LocateTable = ({
                                         checked={isSelected}
                                         onChange={() => onToggleSelect(item.id)}
                                         size="small"
+                                        sx={{ color: TEXT_COLOR }}
                                     />
                                 </TableCell>
 
@@ -1090,8 +1145,8 @@ const LocateTable = ({
                                                     size="small"
                                                     onClick={() => onTag(item)}
                                                     sx={{
-                                                        color: PURPLE_COLOR,
-                                                        '&:hover': { bgcolor: alpha(PURPLE_COLOR, 0.1) }
+                                                        color: '#0F1115',
+                                                        '&:hover': { bgcolor: alpha('#0F1115', 0.1) }
                                                     }}
                                                 >
                                                     <Tag fontSize="small" />
@@ -1100,16 +1155,9 @@ const LocateTable = ({
                                         ) : (
                                             <Tooltip title={item.tags}>
                                                 {item.tags && (
-                                                    <Chip
-                                                        label={item.tags}
-                                                        size="small"
-                                                        sx={{
-                                                            bgcolor: alpha(PURPLE_COLOR, 0.1),
-                                                            color: PURPLE_COLOR,
-                                                            fontSize: '0.65rem',
-                                                            height: 24
-                                                        }}
-                                                    />
+                                                    <Typography sx={{ fontSize: '0.8rem', color: '#0F1115' }}>
+                                                        {item.tags}
+                                                    </Typography>
                                                 )}
                                             </Tooltip>
                                         )}
@@ -1135,7 +1183,7 @@ const LocateTable = ({
                                                 </Box>
                                             </Tooltip>
                                         ) : (
-                                            <Typography variant="body2" color="text.secondary">
+                                            <Typography variant="body2" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                                                 —
                                             </Typography>
                                         )}
@@ -1150,10 +1198,10 @@ const LocateTable = ({
                                             </Tooltip>
                                         )}
                                         <Box>
-                                            <Typography variant="body2" fontWeight={500}>
+                                            <Typography variant="body2" fontWeight={500} sx={{ color: TEXT_COLOR }}>
                                                 {item.customerName}
                                             </Typography>
-                                            <Typography variant="caption" color="text.secondary" display="block">
+                                            <Typography variant="caption" sx={{ color: TEXT_COLOR, opacity: 0.7 }} display="block">
                                                 WO: {item.workOrderNumber}
                                             </Typography>
                                             {item.priorityName && item.priorityName !== 'Standard' && (
@@ -1162,8 +1210,7 @@ const LocateTable = ({
                                                     size="small"
                                                     sx={{
                                                         mt: 0.5,
-                                                        backgroundColor: item.priorityColor || color,
-                                                        color: 'white',
+                                                        color: '#0F1115',
                                                         fontSize: '0.65rem',
                                                         height: 20
                                                     }}
@@ -1175,9 +1222,9 @@ const LocateTable = ({
                                 </TableCell>
 
                                 <TableCell>
-                                    <Typography variant="body2">{addressLine}</Typography>
+                                    <Typography variant="body2" sx={{ color: TEXT_COLOR }}>{addressLine}</Typography>
                                     {location && (
-                                        <Typography variant="caption" color="text.secondary">
+                                        <Typography variant="caption" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                                             {location}
                                         </Typography>
                                     )}
@@ -1185,16 +1232,16 @@ const LocateTable = ({
 
                                 <TableCell>
                                     <Stack spacing={0.5}>
-                                        <Typography variant="caption">
+                                        <Typography variant="caption" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                                             Requested: {formatDate(item.requestedDate)}
                                         </Typography>
                                         {item.calledAt && (
-                                            <Typography variant="caption" color="primary">
+                                            <Typography variant="caption" sx={{ color: BLUE_COLOR }}>
                                                 Called: {formatDate(item.calledAt)}
                                             </Typography>
                                         )}
                                         {item.completionDate && (
-                                            <Typography variant="caption" color="text.secondary">
+                                            <Typography variant="caption" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                                                 Due: {formatDate(item.completionDate)}
                                             </Typography>
                                         )}
@@ -1206,7 +1253,7 @@ const LocateTable = ({
                                         <Avatar sx={{ width: 28, height: 28, bgcolor: color, fontSize: '0.85rem' }}>
                                             {item.techName?.charAt(0) || '?'}
                                         </Avatar>
-                                        <Typography variant="body2">{item.techName}</Typography>
+                                        <Typography variant="body2" sx={{ color: TEXT_COLOR }}>{item.techName}</Typography>
                                     </Stack>
                                 </TableCell>
 
@@ -1215,22 +1262,22 @@ const LocateTable = ({
                                         {item.calledByName ? (
                                             <Box>
                                                 <Box sx={{ display: 'flex', alignItems: 'start', gap: 0.5 }}>
-                                                    <Person fontSize="small" sx={{ color: 'text.secondary' }} />
-                                                    <Typography variant="body2" fontWeight={500}>
+                                                    <Person fontSize="small" sx={{ color: TEXT_COLOR, opacity: 0.7 }} />
+                                                    <Typography variant="body2" fontWeight={500} sx={{ color: TEXT_COLOR }}>
                                                         {item.calledByName}
                                                     </Typography>
                                                 </Box>
                                                 {item.calledByEmail && (
                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                                                        <Email fontSize="small" sx={{ color: 'text.secondary', fontSize: '0.8rem' }} />
-                                                        <Typography variant="caption" color="text.secondary">
+                                                        <Email fontSize="small" sx={{ color: TEXT_COLOR, opacity: 0.7, fontSize: '0.8rem' }} />
+                                                        <Typography variant="caption" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                                                             {item.calledByEmail}
                                                         </Typography>
                                                     </Box>
                                                 )}
                                             </Box>
                                         ) : (
-                                            <Typography variant="body2" color="text.secondary">
+                                            <Typography variant="body2" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                                                 —
                                             </Typography>
                                         )}
@@ -1242,35 +1289,22 @@ const LocateTable = ({
                                         {item.taggedByName ? (
                                             <Box>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                    <Person fontSize="small" sx={{ color: PURPLE_COLOR }} />
-                                                    <Typography variant="body2" color={PURPLE_COLOR} fontWeight={500}>
+                                                    <Person fontSize="small" sx={{ color: '#0F1115' }} />
+                                                    <Typography variant="body2" fontWeight={500}>
                                                         {item.taggedByName}
                                                     </Typography>
                                                 </Box>
                                                 {item.taggedByEmail && (
                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                                                        <Email fontSize="small" sx={{ color: PURPLE_COLOR, fontSize: '0.8rem' }} />
-                                                        <Typography variant="caption" color={PURPLE_COLOR}>
+                                                        <Email fontSize="small" sx={{ color: "#0F1115", fontSize: '0.8rem' }} />
+                                                        <Typography variant="caption">
                                                             {item.taggedByEmail}
                                                         </Typography>
                                                     </Box>
                                                 )}
-                                                {item.manuallyTagged && (
-                                                    <Chip
-                                                        label="Manual Tag"
-                                                        size="small"
-                                                        sx={{
-                                                            mt: 0.5,
-                                                            backgroundColor: alpha(PURPLE_COLOR, 0.1),
-                                                            color: PURPLE_COLOR,
-                                                            fontSize: '0.6rem',
-                                                            height: 18
-                                                        }}
-                                                    />
-                                                )}
                                             </Box>
                                         ) : (
-                                            <Typography variant="body2" color="text.secondary">
+                                            <Typography variant="body2" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                                                 —
                                             </Typography>
                                         )}

@@ -17,7 +17,6 @@ import {
     LinearProgress,
     useTheme,
     useMediaQuery,
-    styled,
     alpha,
 } from '@mui/material';
 import {
@@ -37,15 +36,13 @@ import OutlineButton from './ui/OutlineButton';
 import DeviceList from './DeviceList';
 
 // Define color constants
+const TEXT_COLOR = '#0F1115';
 const BLUE_LIGHT = '#A8C9E9';
 const BLUE_COLOR = '#1976d2';
 const BLUE_DARK = '#1565c0';
 const RED_COLOR = '#ef4444';
-const RED_LIGHT = '#fca5a5';
 const RED_DARK = '#dc2626';
 const GREEN_COLOR = '#10b981';
-const GREEN_LIGHT = '#a7f3d0';
-const GREEN_DARK = '#059669';
 
 export const ProfilePage = ({ roleLabel }) => {
     const { user, updateUser } = useAuth();
@@ -279,10 +276,10 @@ export const ProfilePage = ({ roleLabel }) => {
                     backgroundColor: alpha(RED_COLOR, 0.05),
                     borderLeft: `4px solid ${RED_COLOR}`,
                 }}>
-                    <Typography variant="h6" color={RED_DARK} gutterBottom>
+                    <Typography variant="h6" sx={{ color: TEXT_COLOR }} gutterBottom>
                         Failed to load profile
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                         {fetchError?.message || 'Please try again later.'}
                     </Typography>
                 </Alert>
@@ -300,10 +297,10 @@ export const ProfilePage = ({ roleLabel }) => {
                     backgroundColor: alpha('#f59e0b', 0.05),
                     borderLeft: `4px solid #f59e0b`,
                 }}>
-                    <Typography variant="h6" color="#d97706" gutterBottom>
+                    <Typography variant="h6" sx={{ color: TEXT_COLOR }} gutterBottom>
                         Profile not found
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                         Unable to load profile data. Please refresh the page.
                     </Typography>
                 </Alert>
@@ -338,14 +335,11 @@ export const ProfilePage = ({ roleLabel }) => {
                         fontWeight: 'bold', 
                         mb: 0.5, 
                         fontSize: 20,
-                        background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE_COLOR} 100%)`,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
+                        color: TEXT_COLOR,
                     }}>
                         My Profile
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                         Manage your account settings and preferences
                     </Typography>
                 </Box>
@@ -404,16 +398,17 @@ export const ProfilePage = ({ roleLabel }) => {
                 {/* KEPT ORIGINAL SYNTAX: size={{ xs: 12, md: 8 }} */}
                 <Grid size={{ xs: 12, md: 8 }}>
                     <Paper
-                        elevation={1}
+                        elevation={0}
                         sx={{
                             p: 2,
                             height: '100%',
                             borderRadius: 2,
-                            border: `1px solid ${alpha('#000', 0.08)}`,
+                            border: `1px solid ${alpha(TEXT_COLOR, 0.1)}`,
+                            bgcolor: 'white'
                         }}
                     >
                         <Box display="flex" alignItems="center" mb={3}>
-                            <Typography variant="h6" fontWeight="bold" color={BLUE_DARK}>
+                            <Typography fontWeight="bold" sx={{ color: TEXT_COLOR , fontSize: '1.2rem' }}>
                                 Personal Information
                             </Typography>
                         </Box>
@@ -431,7 +426,7 @@ export const ProfilePage = ({ roleLabel }) => {
                                     error={!formData.name?.trim() && isEditing}
                                     helperText={!formData.name?.trim() && isEditing ? "Name is required" : ""}
                                     InputProps={{
-                                        startAdornment: <PersonIcon sx={{ mr: 1, color: BLUE_COLOR }} />,
+                                        startAdornment: <PersonIcon sx={{ mr: 1, color: '#0F1115' }} />,
                                     }}
                                     variant="outlined"
                                     size="small"
@@ -452,7 +447,7 @@ export const ProfilePage = ({ roleLabel }) => {
                                     error={(!/\S+@\S+\.\S+/.test(formData.email)) && isEditing && formData.email}
                                     helperText={(!/\S+@\S+\.\S+/.test(formData.email)) && isEditing && formData.email ? "Enter valid email" : ""}
                                     InputProps={{
-                                        startAdornment: <EmailIcon sx={{ mr: 1, color: BLUE_COLOR }} />,
+                                        startAdornment: <EmailIcon sx={{ mr: 1, color: '#0F1115' }} />,
                                     }}
                                     variant="outlined"
                                     size="small"
@@ -463,14 +458,14 @@ export const ProfilePage = ({ roleLabel }) => {
 
                         <Divider sx={{ 
                             my: 3,
-                            backgroundColor: alpha(BLUE_COLOR, 0.2),
+                            backgroundColor: alpha(TEXT_COLOR, 0.1),
                         }} />
 
                         <DeviceList devices={profile?.devices || []} />
 
                         {profile?.createdAt && (
                             <Box mt={3}>
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography variant="caption" sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                                     Account created: {new Date(profile.createdAt).toLocaleDateString()}
                                 </Typography>
                             </Box>
@@ -481,12 +476,13 @@ export const ProfilePage = ({ roleLabel }) => {
                 {/* KEPT ORIGINAL SYNTAX: size={{ xs: 12, md: 4 }} */}
                 <Grid size={{ xs: 12, md: 4 }}>
                     <Paper
-                        elevation={1}
+                        elevation={0}
                         sx={{
                             p: 2,
                             height: '100%',
                             borderRadius: 2,
-                            border: `1px solid ${alpha('#000', 0.08)}`,
+                            border: `1px solid ${alpha(TEXT_COLOR, 0.1)}`,
+                            bgcolor: 'white'
                         }}
                     >
                         <Box display="flex" flexDirection="column" alignItems="center">
@@ -497,21 +493,19 @@ export const ProfilePage = ({ roleLabel }) => {
                                     fontSize: 48,
                                     fontWeight: 'bold',
                                     mb: 3,
-                                    background: `linear-gradient(135deg, ${BLUE_LIGHT} 0%, ${BLUE_COLOR} 100%)`,
                                 }}
                             >
                                 {(formData.name?.charAt(0) || profile?.name?.charAt(0) || user?.name?.charAt(0) || 'U')?.toUpperCase()}
                             </Avatar>
 
-                            <Typography variant="h5" fontWeight="bold" align="center" gutterBottom>
+                            <Typography variant="h5" fontWeight="bold" align="center" gutterBottom sx={{ color: TEXT_COLOR }}>
                                 {formData.name || profile?.name || user?.name || 'User'}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary" align="center" mb={3}>
+                            <Typography variant="body2" align="center" mb={3} sx={{ color: TEXT_COLOR, opacity: 0.7 }}>
                                 {formData.email || profile?.email || user?.email || ''}
                             </Typography>
 
                             <Chip
-                                icon={<SecurityIcon />}
                                 label={roleLabel || (profile?.role || user?.role || 'USER').replace('_', ' ').toUpperCase()}
                                 size="small"
                                 sx={{
@@ -519,8 +513,7 @@ export const ProfilePage = ({ roleLabel }) => {
                                     fontWeight: 'bold',
                                     px: 2,
                                     py: 1,
-                                    background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE_COLOR} 100%)`,
-                                    color: '#FFFFFF',
+                                    color: '#0F1115',
                                     '& .MuiChip-icon': {
                                         color: '#FFFFFF',
                                     },
@@ -530,20 +523,18 @@ export const ProfilePage = ({ roleLabel }) => {
 
                         <Divider sx={{ 
                             my: 4,
-                            backgroundColor: alpha(BLUE_COLOR, 0.2),
+                            backgroundColor: alpha(TEXT_COLOR, 0.1),
                         }} />
 
                         <Box display="flex" flexDirection="column" gap={2}>
-                            <GradientButton
+                            <OutlineButton
                                 fullWidth
-                                variant="contained"
-                                startIcon={<SecurityIcon />}
                                 onClick={() => setOpenPasswordDialog(true)}
                                 disabled={updating || changePasswordMutation.isPending}
                                 size="large"
                             >
                                 Change Password
-                            </GradientButton>
+                            </OutlineButton>
                         </Box>
                     </Paper>
                 </Grid>
@@ -557,16 +548,14 @@ export const ProfilePage = ({ roleLabel }) => {
                 PaperProps={{
                     sx: {
                         borderRadius: 3,
+                        bgcolor: 'white'
                     }
                 }}
             >
                 <DialogTitle sx={{ 
-                    pb: 2,
-                    background: `linear-gradient(135deg, ${BLUE_COLOR} 0%, ${BLUE_DARK} 100%)`,
-                    color: 'white',
+                    color: '#0F1115',
                 }}>
-                    <Box display="flex" alignItems="center" gap={1}>
-                        <SecurityIcon />
+                    <Box display="flex" alignItems="center" sx={{fontSize: '1.2rem'}} gap={1}>
                         Change Password
                     </Box>
                 </DialogTitle>
@@ -574,12 +563,11 @@ export const ProfilePage = ({ roleLabel }) => {
                     <Box sx={{ pt: 2 }}>
                         {passwordError && (
                             <Alert severity="error" sx={{ 
-                                mb: 2,
                                 borderRadius: 2,
                                 backgroundColor: alpha(RED_COLOR, 0.05),
                                 borderLeft: `4px solid ${RED_COLOR}`,
                             }}>
-                                {passwordError}
+                                <Typography sx={{ color: TEXT_COLOR }}>{passwordError}</Typography>
                             </Alert>
                         )}
 
@@ -595,7 +583,6 @@ export const ProfilePage = ({ roleLabel }) => {
                             size='small'
                             disabled={changePasswordMutation.isPending}
                             variant="outlined"
-                            sx={{ mb: 2 }}
                         />
 
                         <StyledTextField
@@ -611,7 +598,6 @@ export const ProfilePage = ({ roleLabel }) => {
                             helperText="Password must be at least 6 characters"
                             disabled={changePasswordMutation.isPending}
                             variant="outlined"
-                            sx={{ mb: 2 }}
                         />
 
                         <StyledTextField
@@ -667,7 +653,7 @@ export const ProfilePage = ({ roleLabel }) => {
                     }}
                     elevation={6}
                 >
-                    <Typography fontWeight={500}>{success}</Typography>
+                    <Typography fontWeight={500} sx={{ color: TEXT_COLOR }}>{success}</Typography>
                 </Alert>
             </Snackbar>
 
@@ -691,7 +677,7 @@ export const ProfilePage = ({ roleLabel }) => {
                     }}
                     elevation={6}
                 >
-                    <Typography fontWeight={500}>{error}</Typography>
+                    <Typography fontWeight={500} sx={{ color: TEXT_COLOR }}>{error}</Typography>
                 </Alert>
             </Snackbar>
         </Box>
