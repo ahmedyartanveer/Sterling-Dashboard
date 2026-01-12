@@ -1,322 +1,231 @@
-from rest_framework import viewsets, status, generics, filters
+from rest_framework import viewsets, status, generics
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.views import APIView
-from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate
 from django.db.models import Q
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework_simplejwt.tokens import RefreshToken
+from django.utils import timezone
 
-from .serializers import (
-    UserSerializer, RegisterSerializer, LoginSerializer, 
-    ChangePasswordSerializer, UserDeviceSerializer, UpdateProfileSerializer, 
-    CreateUserSerializer, UpdateUserAdminSerializer
-)
-from .models import UserDevice
-from .permissions import IsSuperAdmin # Import the permission we created
 
-User = get_user_model()
-
-# ============================================================================
-# HELPER: Token Generation
-# ============================================================================
-def get_token(user):
-    """
-    Generates JWT token. 
-    Matches Node: generateToken(user._id, user.role)
-    """
-    refresh = RefreshToken.for_user(user)
-    refresh['role'] = user.role 
-    return str(refresh.access_token)
-
-# ============================================================================
-# PAGINATION (Matches Node logic)
-# ============================================================================
-class CustomPagination(PageNumberPagination):
-    page_size = 20
-    page_size_query_param = 'limit'
-    
-    def get_paginated_response(self, data):
-        return Response({
-            'success': True,
-            'count': len(data),
-            'total': self.page.paginator.count,
-            'totalPages': self.page.paginator.num_pages,
-            'currentPage': self.page.number,
-            'data': data
-        })
-
-# ============================================================================
-# CONTROLLER 1: AUTHENTICATION (authController.js)
-# ============================================================================
-from rest_framework import viewsets, status, generics, filters
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.views import APIView
-from django.contrib.auth import get_user_model
-from django.db.models import Q
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework_simplejwt.tokens import RefreshToken
-from drf_yasg.utils import swagger_auto_schema  # (Optional) For better docs control
+# Swagger Imports
+from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
+from .models import User, UserDevice
 from .serializers import (
     UserSerializer, RegisterSerializer, LoginSerializer, 
-    ChangePasswordSerializer, UserDeviceSerializer, UpdateProfileSerializer, 
-    CreateUserSerializer, UpdateUserAdminSerializer
+    UpdateProfileSerializer, ChangePasswordSerializer,
+    CreateUserSerializer, UpdateUserSerializer, BulkStatusSerializer
 )
-from .models import UserDevice
-from .permissions import IsSuperAdmin
+from .permissions import IsSuperAdmin 
+from .helper import CustomPagination, get_tokens_for_user
 
-User = get_user_model()
 
-# ... (Helper function: get_token and CustomPagination remain same) ...
 
-# ============================================================================
-# CONTROLLER 1: AUTHENTICATION (Fixed for Swagger Input Body)
-# ============================================================================
+
+
+
+
+# ==========================================
+# AUTH CONTROLLER
+# ==========================================
 class AuthView(viewsets.GenericViewSet):
-    """
-    Groups all Auth related logic.
-    Inherits from GenericViewSet to support Swagger Schema generation automatically.
-    """
-    
-    def get_serializer_class(self):
-        """
-        This function tells Swagger which serializer to use for which action.
-        """
-        if self.action == 'register':
-            return RegisterSerializer
-        elif self.action == 'login':
-            return LoginSerializer
-        elif self.action == 'update_profile':
-            return UpdateProfileSerializer
-        elif self.action == 'change_password':
-            return ChangePasswordSerializer
-        elif self.action == 'get_me':
-            return UserSerializer
-        return UserSerializer # Default fallback
+    permission_classes = [AllowAny] 
 
-    def get_permissions(self):
-        if self.action in ['register', 'login']:
-            return [AllowAny()]
-        return [IsAuthenticated()]
-
-    # --- Register ---
+    @swagger_auto_schema(request_body=RegisterSerializer, responses={201: UserSerializer})
     def register(self, request):
-        # Use self.get_serializer to let DRF handle context automatically
-        serializer = self.get_serializer(data=request.data)
+        serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            token = get_token(user)
-            
+            token = get_tokens_for_user(user)
             return Response({
                 'success': True,
                 'message': 'User registered successfully',
                 'token': token,
                 'user': UserSerializer(user).data
             }, status=status.HTTP_201_CREATED)
-        
         return Response({'success': False, 'message': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-    # --- Login ---
+    @swagger_auto_schema(request_body=LoginSerializer, responses={200: UserSerializer})
     def login(self, request):
-        # Swagger will now see LoginSerializer fields here
-        serializer = self.get_serializer(data=request.data)
-        
-        if serializer.is_valid():
-            user = serializer.validated_data['user']
-            device_info = request.data.get('device')
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+             return Response({'success': False, 'message': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-            # ---- DEVICE SAVE LOGIC ----
-            if device_info and isinstance(device_info, dict) and 'deviceId' in device_info:
-                device_id = device_info['deviceId']
-                
-                # Check if device exists
-                existing_device = UserDevice.objects.filter(user=user, device_id=device_id).exists()
-                
-                if not existing_device:
-                    current_count = UserDevice.objects.filter(user=user).count()
-                    if current_count >= 5:
-                        oldest = UserDevice.objects.filter(user=user).order_by('date').first()
-                        if oldest:
-                            oldest.delete()
-                    
-                    UserDevice.objects.create(
-                        user=user,
-                        device_id=device_id,
-                        browser=device_info.get('browser'),
-                        os=device_info.get('os'),
-                        device_type=device_info.get('deviceType')
-                    )
-            # ---- END DEVICE LOGIC ----
+        email = serializer.validated_data['email']
+        password = serializer.validated_data['password']
+        device_data = serializer.validated_data.get('device', {})
 
-            token = get_token(user)
-            
-            return Response({
-                'success': True,
-                'message': 'Login successful',
-                'token': token,
-                'user': UserSerializer(user).data
-            }, status=status.HTTP_200_OK)
+        user = authenticate(email=email, password=password)
 
-        return Response({'success': False, 'message': 'Invalid credentials or inactive account'}, status=status.HTTP_400_BAD_REQUEST)
+        if not user:
+            return Response({'success': False, 'message': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+        if not user.is_active:
+            return Response({'success': False, 'message': 'User account is inactive'}, status=status.HTTP_403_FORBIDDEN)
 
-    # --- Get Me ---
-    def get_me(self, request):
-        user = request.user
+        # ---- DEVICE LOGIC (100% Node Match) ----
+        if device_data and 'deviceId' in device_data:
+            device_id = device_data['deviceId']
+            device_obj, created = UserDevice.objects.get_or_create(
+                user=user, 
+                device_id=device_id,
+                defaults={
+                    'browser': device_data.get('browser'),
+                    'browser_version': device_data.get('browserVersion'),
+                    'os': device_data.get('os'),
+                    'os_version': device_data.get('osVersion'),
+                    'device_type': device_data.get('deviceType')
+                }
+            )
+
+            if not created:
+                device_obj.date = timezone.now() # Update timestamp
+                if device_data.get('browser'): device_obj.browser = device_data.get('browser')
+                device_obj.save()
+            else:
+                # Check limit (Max 5)
+                current_devices = UserDevice.objects.filter(user=user).order_by('date')
+                if current_devices.count() > 5:
+                    current_devices.first().delete() # Remove oldest
+        # ----------------------------------------
+
+        token = get_tokens_for_user(user)
         return Response({
             'success': True,
+            'message': 'Login successful',
+            'token': token,
             'user': UserSerializer(user).data
         })
 
-    # --- Update Profile ---
+    @swagger_auto_schema(permission_classes=[IsAuthenticated], responses={200: UserSerializer})
+    def get_me(self, request):
+        if not request.user.is_authenticated:
+            return Response({'success': False, 'message': 'Not authorized'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'success': True, 'user': UserSerializer(request.user).data})
+
+    @swagger_auto_schema(request_body=UpdateProfileSerializer, permission_classes=[IsAuthenticated])
     def update_profile(self, request):
-        user = request.user
-        serializer = self.get_serializer(user, data=request.data, partial=True)
+        if not request.user.is_authenticated:
+            return Response({'success': False, 'message': 'Not authorized'}, status=status.HTTP_401_UNAUTHORIZED)
         
+        serializer = UpdateProfileSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
-            updated_user = serializer.save()
-            return Response({
-                'success': True,
-                'user': UserSerializer(updated_user).data
-            })
-            
+            user = serializer.save()
+            return Response({'success': True, 'user': UserSerializer(user).data})
         return Response({'success': False, 'message': serializer.errors}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # --- Change Password ---
+    @swagger_auto_schema(request_body=ChangePasswordSerializer, permission_classes=[IsAuthenticated])
     def change_password(self, request):
-        serializer = self.get_serializer(data=request.data)
+        if not request.user.is_authenticated:
+             return Response({'success': False, 'message': 'Not authorized'}, status=status.HTTP_401_UNAUTHORIZED)
         
+        serializer = ChangePasswordSerializer(data=request.data)
         if serializer.is_valid():
             user = request.user
+            if not user.check_password(serializer.validated_data['currentPassword']):
+                return Response({'success': False, 'message': 'Current password is incorrect'}, status=status.HTTP_400_BAD_REQUEST)
+            
             user.set_password(serializer.validated_data['newPassword'])
             user.save()
             return Response({'success': True, 'message': 'Password changed successfully'})
-            
-        return Response({'success': False, 'message': serializer.errors.get('message', 'Error')}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'success': False, 'message': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-# ============================================================================
-# CONTROLLER 2: USER MANAGEMENT (userController.js)
-# ============================================================================
 
+# ==========================================
+# USER CONTROLLER (Admin)
+# ==========================================
 class UserViewSet(viewsets.ModelViewSet):
-    """
-    Handles getAllUsers, createUser, updateUser, deleteUser
-    Matches: router.get('/', adminAccess, ...)
-    """
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated, IsSuperAdmin] # Matches adminAccess
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
     pagination_class = CustomPagination
 
-    # --- Get All Users (Logic Match) ---
+    # --- 1. Get All Users (with Filters) ---
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('search', openapi.IN_QUERY, description="Name/Email/Role", type=openapi.TYPE_STRING),
+            openapi.Parameter('role', openapi.IN_QUERY, description="Filter by role", type=openapi.TYPE_STRING),
+            openapi.Parameter('status', openapi.IN_QUERY, description="active/inactive", type=openapi.TYPE_STRING),
+            openapi.Parameter('excludeCurrent', openapi.IN_QUERY, description="true/false", type=openapi.TYPE_BOOLEAN),
+        ]
+    )
     def list(self, request, *args, **kwargs):
-        # 1. Base Query
         queryset = self.get_queryset()
-
-        # 2. Filter: excludeCurrent
+        
+        # Node Logic Implementation
         if request.query_params.get('excludeCurrent') == 'true':
             queryset = queryset.exclude(id=request.user.id)
-
-        # 3. Filter: Role
+        
         role = request.query_params.get('role')
         if role and role != 'all':
             queryset = queryset.filter(role=role)
 
-        # 4. Filter: Status
         status_param = request.query_params.get('status')
         if status_param and status_param != 'all':
-            if status_param == 'active':
-                queryset = queryset.filter(is_active=True)
-            elif status_param == 'inactive':
-                queryset = queryset.filter(is_active=False)
+            is_active = True if status_param == 'active' else False
+            queryset = queryset.filter(is_active=is_active)
 
-        # 5. Search (Regex in Node -> icontains in Django)
         search = request.query_params.get('search')
         if search:
             queryset = queryset.filter(
-                Q(name__icontains=search) | 
-                Q(email__icontains=search) | 
-                Q(role__icontains=search)
+                Q(name__icontains=search) | Q(email__icontains=search) | Q(role__icontains=search)
             )
 
-        # 6. Sorting
-        sort_by = request.query_params.get('sortBy', 'date_joined')
+        sort_by = request.query_params.get('sortBy', 'created_at')
         sort_order = request.query_params.get('sortOrder', 'desc')
-        if sort_order == 'desc':
-            sort_by = f'-{sort_by}'
+        if sort_order == 'desc': sort_by = f'-{sort_by}'
         queryset = queryset.order_by(sort_by)
 
-        # 7. Pagination & Response
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
-
+        
         serializer = self.get_serializer(queryset, many=True)
         return Response({'success': True, 'data': serializer.data})
 
-    # --- Create User (Logic Match) ---
+    # --- 2. Create User ---
+    @swagger_auto_schema(request_body=CreateUserSerializer)
     def create(self, request, *args, **kwargs):
-        serializer = CreateUserSerializer(data=request.data, context={'request': request})
+        if request.data.get('role') == 'superadmin' and request.user.role != 'superadmin':
+            return Response({'success': False, 'message': 'Only superadmin can create superadmin users'}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = CreateUserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            
-            # Format output specifically to remove password etc
-            user_data = UserSerializer(user).data
-            return Response({
-                'success': True, 
-                'message': 'User created successfully', 
-                'data': user_data
-            }, status=status.HTTP_201_CREATED)
-            
+            return Response({'success': True, 'message': 'User created successfully', 'data': UserSerializer(user).data}, status=status.HTTP_201_CREATED)
         return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-    # --- Update User (Logic Match) ---
+    # --- 3. Update User (Using UpdateUserSerializer) ---
+    @swagger_auto_schema(request_body=UpdateUserSerializer)
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
         
-        # Superadmin Protection Logic
+        # Permission Logic
         if instance.role == 'superadmin' and request.user.role != 'superadmin':
-            return Response({'success': False, 'message': 'Only superadmin can modify superadmin users'}, status=status.HTTP_403_FORBIDDEN)
+             return Response({'success': False, 'message': 'Only superadmin can modify superadmin users'}, status=status.HTTP_403_FORBIDDEN)
+        if request.data.get('role') == 'superadmin' and request.user.role != 'superadmin':
+             return Response({'success': False, 'message': 'Only superadmin can assign superadmin role'}, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = UpdateUserAdminSerializer(instance, data=request.data, partial=True, context={'request': request})
-        
+        serializer = UpdateUserSerializer(instance, data=request.data, partial=True)
         if serializer.is_valid():
             user = serializer.save()
-            return Response({
-                'success': True, 
-                'message': 'User updated successfully', 
-                'data': UserSerializer(user).data
-            })
-            
+            return Response({'success': True, 'message': 'User updated successfully', 'data': UserSerializer(user).data})
         return Response({'success': False, 'message': str(serializer.errors)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # --- Delete User (Logic Match) ---
+    # --- 4. Delete User ---
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-
         if instance.role == 'superadmin':
             return Response({'success': False, 'message': 'Cannot delete superadmin user'}, status=status.HTTP_403_FORBIDDEN)
-        
         if instance.id == request.user.id:
             return Response({'success': False, 'message': 'Cannot delete your own account'}, status=status.HTTP_403_FORBIDDEN)
-
+        
         self.perform_destroy(instance)
         return Response({'success': True, 'message': 'User deleted successfully'})
 
-    # --- Get By ID ---
-    def retrieve(self, request, *args, **kwargs):
-        try:
-            instance = self.get_object()
-            return Response({'success': True, 'data': UserSerializer(instance).data})
-        except:
-             return Response({'success': False, 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    # --- Toggle Status ---
+    # --- 5. Toggle Status (Route: /:id/toggle-status) ---
+    @swagger_auto_schema(request_body=openapi.Schema(type=openapi.TYPE_OBJECT, properties={}))
     def toggle_status(self, request, pk=None):
         try:
             user = self.get_queryset().get(pk=pk)
@@ -325,96 +234,61 @@ class UserViewSet(viewsets.ModelViewSet):
 
         if user.role == 'superadmin':
             return Response({'success': False, 'message': 'Cannot deactivate superadmin user'}, status=status.HTTP_403_FORBIDDEN)
-        
         if user.id == request.user.id:
              return Response({'success': False, 'message': 'Cannot deactivate your own account'}, status=status.HTTP_403_FORBIDDEN)
 
         user.is_active = not user.is_active
         user.save()
-
         status_msg = 'activated' if user.is_active else 'deactivated'
-        return Response({
-            'success': True, 
-            'message': f'User {status_msg} successfully', 
-            'data': UserSerializer(user).data
-        })
+        return Response({'success': True, 'message': f'User {status_msg} successfully', 'data': UserSerializer(user).data})
 
-    # --- Bulk Update Status ---
+    # --- 6. Bulk Status (Route: /bulk-status) ---
+    @swagger_auto_schema(request_body=BulkStatusSerializer)
     def bulk_status(self, request):
-        user_ids = request.data.get('userIds', [])
-        is_active = request.data.get('isActive')
-        
-        if not user_ids:
-            return Response({'success': False, 'message': 'Please provide user IDs'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = BulkStatusSerializer(data=request.data)
+        if not serializer.is_valid():
+             return Response({'success': False, 'message': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Logic: Filter out superadmins and self
-        users_to_update = User.objects.filter(id__in=user_ids)
+        user_ids = serializer.validated_data['userIds']
+        is_active = serializer.validated_data['isActive']
         
-        # Validation checks
-        if users_to_update.filter(role='superadmin').exists():
+        users = User.objects.filter(id__in=user_ids)
+        if users.filter(role='superadmin').exists():
             return Response({'success': False, 'message': 'Cannot modify superadmin users'}, status=status.HTTP_403_FORBIDDEN)
-        
-        if users_to_update.filter(id=request.user.id).exists() and is_active is False:
+        if users.filter(id=request.user.id).exists() and is_active is False:
              return Response({'success': False, 'message': 'Cannot deactivate your own account'}, status=status.HTTP_403_FORBIDDEN)
-            
-        count = users_to_update.update(is_active=is_active)
+
+        updated_count = users.update(is_active=is_active)
         status_msg = 'activated' if is_active else 'deactivated'
-        
-        return Response({'success': True, 'message': f'{count} user(s) {status_msg} successfully'})
+        return Response({'success': True, 'message': f'{updated_count} user(s) {status_msg} successfully'})
 
 
-# ============================================================================
-# SPECIAL VIEWS (To match specific Node Routes)
-# ============================================================================
+# ==========================================
+# SPECIAL VIEWS
+# ==========================================
 
-class UserTechView(generics.ListAPIView):
-    """
-    Matches: router.get('/tech', userController.getTechRoleUsers);
-    NOTE: In Node, this route does NOT have 'adminAccess', only 'protect'.
-    So permission is IsAuthenticated (not SuperAdmin).
-    """
+# Tech Users View
+class TechUserView(generics.ListAPIView):
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated] # Note: Node logic didn't have admin check for this
     pagination_class = CustomPagination
 
-    def list(self, request, *args, **kwargs):
-        # Base filter: role='tech'
+    def get_queryset(self):
+        # Same filtering logic as UserViewSet logic can be applied here
         queryset = User.objects.filter(role='tech')
-        
-        # Apply standard filters (Copy of list logic above)
-        if request.query_params.get('excludeCurrent') == 'true':
-            queryset = queryset.exclude(id=request.user.id)
-            
-        status_param = request.query_params.get('status')
-        if status_param == 'active': queryset = queryset.filter(is_active=True)
-        elif status_param == 'inactive': queryset = queryset.filter(is_active=False)
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return response
 
-        search = request.query_params.get('search')
-        if search:
-            queryset = queryset.filter(
-                Q(name__icontains=search) | Q(email__icontains=search)
-            )
-            
-        # Pagination
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-            
-        return Response({'success': True, 'count': queryset.count(), 'data': self.get_serializer(queryset, many=True).data})
-
+# Check Email View
 class CheckEmailView(APIView):
-    """
-    Matches: router.get('/check-email/:email', adminAccess, ...);
-    """
     permission_classes = [IsAuthenticated, IsSuperAdmin]
 
     def get(self, request, email):
         user = User.objects.filter(email=email).first()
-        data = {'id': user.id, 'name': user.name, 'email': user.email, 'role': user.role} if user else None
-        
-        return Response({
-            'success': True, 
-            'exists': bool(user), 
-            'data': data
-        })
+        data = None
+        if user:
+            data = {'id': user.id, 'name': user.name, 'email': user.email, 'role': user.role}
+        return Response({'success': True, 'exists': bool(user), 'data': data})
