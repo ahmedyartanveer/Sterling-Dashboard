@@ -33,7 +33,7 @@ class FieldEdgeScraper:
 
     async def login(self):
         """Handles login logic"""
-        await self.page.goto('https://login.fieldedge.com/Account/Login', wait_until='domcontentloaded')
+        # await self.page.goto('https://login.fieldedge.com/Account/Login', wait_until='domcontentloaded')
         await self.page.fill('input[name="UserName"]', self.dash_email)
         await self.page.fill('input[name="Password"]', self.dash_password)
 
@@ -130,7 +130,7 @@ class FieldEdgeScraper:
                 await self.login()
                 # Ensure we represent correct navigation after login if needed, 
                 # strictly following original script which explicitly goes to /Dispatch
-                await self.page.goto('https://login.fieldedge.com/Dispatch', wait_until='domcontentloaded')
+                # await self.page.goto('https://login.fieldedge.com/Dispatch', wait_until='domcontentloaded')
 
             await self.select_status('Assigned')
 
