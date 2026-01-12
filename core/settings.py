@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'django_filters',
     'drf_spectacular',
     'rest_framework_simplejwt',
+    'drf_yasg',
     'accounts',
     'locates',
 ]
