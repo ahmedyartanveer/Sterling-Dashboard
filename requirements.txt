@@ -7,4 +7,5 @@ drf-yasg==1.21.11
 mysqlclient==2.2.7
 python-dotenv==1.2.1
 django-cors-headers==4.9.0
+Faker==40.1.0
 playwright

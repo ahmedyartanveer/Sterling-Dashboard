@@ -4,6 +4,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 from datetime import datetime, timedelta
+import json
 
 # Load environment variables
 load_dotenv()
@@ -154,10 +155,9 @@ class FieldEdgeScraper:
                     const taskDuration = getTextByClass(row, '.col12');
 
                     rows.push({
-                        serial: index + 1,
                         priorityColor: pColor,
                         priorityName: pName,
-                        woNumber: woNumber,
+                        workOrderNumber: woNumber,
                         customerPO: customerPO,
                         customerName: customerName,
                         customerAddress: customerAddr,
@@ -167,7 +167,7 @@ class FieldEdgeScraper:
                         promisedAppointment: promisedAppt,
                         createdDate: createdDate,
                         scheduledDate: scheduledDate,
-                        taskDuration: taskDuration
+                        task: taskDuration
                     });
 
                 } catch (err) {
@@ -210,13 +210,13 @@ class FieldEdgeScraper:
             await self.apply_filters()
 
             scraped = await self.scrape_data()
-
+            print(f"{start_date} {start_time}")
+            print(f"{end_date} {end_time}")
             result = {
                 "filterStartDate": start_date,
                 "filterEndDate": end_date,
-                "dispatchDate": datetime.now().strftime('%m/%d/%Y'),
-                "workOrders": scraped['rows'],
                 "totalWorkOrders": len(scraped['rows']),
+                "workOrders": scraped['rows'],
             }
 
             return result
@@ -226,15 +226,23 @@ class FieldEdgeScraper:
         finally:
             if self.browser:
                 await self.browser.close()
+    
+    def inseat_locates(self, locates_data):
+        """Inserts locates data using InseartLocatesService"""
+        from inseartLocates import InseartLocatesService
+        inserter = InseartLocatesService()
+        success = inserter.insert_locates(locates_data)
+        return success
 
 # --- Execution ---
 async def main():
     scraper = FieldEdgeScraper()
     data = await scraper.run()
+    if data:
+        scraper.inseat_locates(data)
+    else:
+        print("No data scraped.")
     
-    # Printing result to verify output matches Node.js version
-    import json
-    print(json.dumps(data, indent=2))
-
+    
 if __name__ == "__main__":
     asyncio.run(main())

@@ -50,7 +50,7 @@ class User(AbstractUser):
 class UserDevice(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='devices')
     device_id = models.CharField(max_length=255)
-    browser = models.CharField(max_length=100, blank=True, null=True)
+    browser = models.CharField(max_length=255, blank=True, null=True)
     browser_version = models.CharField(max_length=50, blank=True, null=True)
     os = models.CharField(max_length=50, blank=True, null=True)
     os_version = models.CharField(max_length=50, blank=True, null=True)

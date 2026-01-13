@@ -47,26 +47,26 @@ class LocatesController(viewsets.GenericViewSet):
         for wo in work_orders_data:
             WorkOrder.objects.create(
                 dashboard=dashboard,
-                work_order_number=wo.get('workOrderNumber'),
-                priority_color=wo.get('priorityColor'),
-                priority_name=wo.get('priorityName'),
-                customer_name=wo.get('customerName'),
-                customer_address=wo.get('customerAddress'),
-                tags=wo.get('tags'),
-                tech_name=wo.get('techName'),
-                promised_appointment=wo.get('promisedAppointment'),
-                created_date=wo.get('createdDate'),
-                requested_date=wo.get('requestedDate'),
-                completed_date_str=wo.get('completedDate'),
-                task=wo.get('task'),
-                task_duration=wo.get('taskDuration'),
-                purchase_status=wo.get('purchaseStatus'),
-                purchase_status_name=wo.get('purchaseStatusName'),
+                work_order_number=wo.get('workOrderNumber', 0),
+                priority_color=wo.get('priorityColor', ''),
+                priority_name=wo.get('priorityName', ''),
+                customer_name=wo.get('customerName', ''),
+                customer_address=wo.get('customerAddress', ''),
+                tags=wo.get('tags', ''),
+                tech_name=wo.get('techName', ''),
+                promised_appointment=wo.get('promisedAppointment', ''),
+                created_date=wo.get('createdDate', ''),
+                requested_date=wo.get('requestedDate', ''),
+                completed_date_str=wo.get('completedDate', ''),
+                task=wo.get('task', ''),
+                task_duration=wo.get('taskDuration', ''),
+                purchase_status=wo.get('purchaseStatus', ''),
+                purchase_status_name=wo.get('purchaseStatusName', ''),
                 serial=wo.get('serial', 0),
                 assigned=wo.get('assigned', False),
                 dispatched=wo.get('dispatched', False),
                 scheduled=wo.get('scheduled', False),
-                scheduled_date=wo.get('scheduledDate')
+                scheduled_date=wo.get('scheduledDate', '')
             )
             
         return Response({'success': True, 'message': 'Dashboard synced successfully'}, status=status.HTTP_201_CREATED)
