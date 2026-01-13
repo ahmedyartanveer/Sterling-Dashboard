@@ -214,7 +214,7 @@ class FieldEdgeScraper:
             result = {
                 "filterStartDate": start_date,
                 "filterEndDate": end_date,
-                # "dispatchDate": scraped['dispatchDate'],
+                "dispatchDate": datetime.now().strftime('%m/%d/%Y'),
                 "workOrders": scraped['rows'],
                 "totalWorkOrders": len(scraped['rows']),
             }
