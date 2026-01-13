@@ -4,9 +4,9 @@ from datetime import timedelta
 import math
 
 class DashboardData(models.Model):
-    filter_start_date = models.CharField(max_length=50, blank=True, null=True)
-    filter_end_date = models.CharField(max_length=50, blank=True, null=True)
-    dispatch_date = models.CharField(max_length=50, blank=True, default='')
+    filter_start_date = models.DateTimeField(blank=True, null=True)
+    filter_end_date = models.DateTimeField(blank=True, null=True)
+    dispatch_date = models.DateTimeField(blank=True, null=True)
     total_work_orders = models.IntegerField(default=0)
     source = models.CharField(max_length=100, default='external-dashboard')
     scraped_at = models.DateTimeField(default=timezone.now)
