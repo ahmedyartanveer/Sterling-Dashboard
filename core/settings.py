@@ -178,5 +178,5 @@ SIMPLE_JWT = {
 # If True, the whitelist will not be used and all origins will be accepted.
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
-    os.getenv('CORS_ALLOWED_ORIGINS', "http://localhost:3000")
+    x.strip() for x in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',')
 ]
