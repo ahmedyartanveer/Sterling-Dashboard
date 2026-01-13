@@ -4,7 +4,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 from datetime import datetime, timedelta
-import json
+from service.inseartLocates import InseartLocatesService
 
 # Load environment variables
 load_dotenv()
@@ -229,7 +229,6 @@ class FieldEdgeScraper:
     
     def inseat_locates(self, locates_data):
         """Inserts locates data using InseartLocatesService"""
-        from inseartLocates import InseartLocatesService
         inserter = InseartLocatesService()
         success = inserter.insert_locates(locates_data)
         return success
@@ -244,5 +243,7 @@ async def main():
         print("No data scraped.")
     
     
-if __name__ == "__main__":
+def start_scraping():
+    print("Scraping started...")
     asyncio.run(main())
+    print("Scraping finished.")

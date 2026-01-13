@@ -26,8 +26,8 @@ class InseartLocatesService:
         print("Attempting to login...")
         try:
             body = {
-                "email": "admin@gmail.com",
-                "password": "admin",
+                "email": os.getenv('API_EMAIL', 'admin@gmail.com'),
+                "password": os.getenv('API_PASSWORD', 'admin'),
                 "device": {
                     "deviceId": self.faker.uuid4(),
                     "browser": "Chrome", # Fixed: Short name to prevent DB error
