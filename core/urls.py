@@ -1,8 +1,9 @@
-# sterling_dashboard/urls.py (Main URL file)
+# sterling_dashboard/urls.py
 
 from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+from . import scheduler 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -10,12 +11,15 @@ urlpatterns = [
     path('api/', include('locates.urls')),
     
     # --- API Documentation URLs ---
-    # 1. Schema File (Downloadable YAML/JSON)
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    
-    # 2. Swagger UI (Clean Interface - Recommended)
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    
-    # 3. Redoc UI (Alternative Interface)
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
+
+# -----------------------------------------------
+# Scheduler Start Code (Place it here at the end)
+# -----------------------------------------------
+try:
+    scheduler.start()
+except Exception as e:
+    print(f"Scheduler failed to start: {e}")

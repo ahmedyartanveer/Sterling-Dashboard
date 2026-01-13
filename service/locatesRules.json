@@ -1,0 +1,26 @@
+[
+    {
+        "_comment_login": "FieldEdge login configuration",
+        "web_url": "https://login.fieldedge.com/Dispatch",
+        "username_xpath": "input[name='UserName']",
+        "password_xpath": "input[name='Password']",
+        "login_button_xpath": "input[type='submit'][value='Sign in to your account']",
+
+        "_comment_status": "Task status info",
+        "status_name": "Assigned",
+        "is_apply_task": false,
+        "task_dropdown_xpath": "//span[text()='Task']",
+        "task_option_name": "EXCAVATION DRAIN FIELD REPAIR",
+
+        "_comment_date": "Date format: 10-12-2023",
+        "start_date": "",
+        "end_date": "",
+
+        "_comment_time": "Time format: 01:10 AM",
+        "start_time": "",
+        "end_time": "",
+
+        "time_offset_minutes": 300,
+        "apply_button_xpath": ".plot-map-button:has-text('Apply')"
+    }
+]
