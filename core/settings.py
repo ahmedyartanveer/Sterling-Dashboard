@@ -29,7 +29,7 @@ SECRET_KEY = 'django-insecure-ot=+qp09)^=ws6yv!vwuf0cn@-91t^n3(l@yjp6be10qv185p5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -53,6 +53,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -61,7 +62,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
+STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 ROOT_URLCONF = 'core.urls'
 
 TEMPLATES = [
@@ -178,5 +181,5 @@ SIMPLE_JWT = {
 # If True, the whitelist will not be used and all origins will be accepted.
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
-    os.getenv('CORS_ALLOWED_ORIGINS', "http://localhost:3000")
+    os.getenv('CORS_ALLOWED_ORIGINS', "http://38.54.108.152:3000",)
 ]
