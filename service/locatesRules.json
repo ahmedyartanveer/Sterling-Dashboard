@@ -8,7 +8,7 @@
 
         "_comment_status": "Task status info",
         "status_name": "Assigned",
-        "is_apply_task": false,
+        "is_apply_task": true,
         "task_dropdown_xpath": "//span[text()='Task']",
         "task_option_name": "EXCAVATION DRAIN FIELD REPAIR",
 
@@ -20,7 +20,7 @@
         "start_time": "",
         "end_time": "",
 
-        "time_offset_minutes": 300,
+        "time_offset_minutes": 10,
         "apply_button_xpath": ".plot-map-button:has-text('Apply')"
     }
 ]
