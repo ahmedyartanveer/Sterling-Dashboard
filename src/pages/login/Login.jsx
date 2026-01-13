@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { Helmet } from 'react-helmet-async';
@@ -26,6 +26,8 @@ import {
   Link,
   InputAdornment,
   IconButton,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import GradientButton from '../../components/ui/GradientButton';
 import StyledTextField from '../../components/ui/StyledTextField';
@@ -52,6 +54,25 @@ export const Login = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // Load saved email from localStorage on component mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+
+  // Save or remove email based on rememberMe state
+  useEffect(() => {
+    if (rememberMe && email) {
+      localStorage.setItem('rememberedEmail', email);
+    } else if (!rememberMe) {
+      localStorage.removeItem('rememberedEmail');
+    }
+  }, [rememberMe, email]);
 
   // Login form submission
   const handleSubmit = async (e) => {
@@ -73,6 +94,25 @@ export const Login = () => {
   const handleForgotPassword = () => {
     // Implement forgot password logic
     console.log('Forgot password clicked');
+  };
+
+  // Handle remember me checkbox change
+  const handleRememberMeChange = (e) => {
+    const isChecked = e.target.checked;
+    setRememberMe(isChecked);
+
+    if (isChecked && email) {
+      localStorage.setItem('rememberedEmail', email);
+    } else {
+      localStorage.removeItem('rememberedEmail');
+    }
+  };
+
+  // Clear remembered email
+  const handleClearRememberedEmail = () => {
+    localStorage.removeItem('rememberedEmail');
+    setEmail('');
+    setRememberMe(false);
   };
 
   return (
@@ -98,9 +138,7 @@ export const Login = () => {
             top: 0,
             left: 0,
             right: 0,
-            height: '4px',
-            background: `linear-gradient(135deg, ${BLUE_COLOR} 0%, ${BLUE_DARK} 100%)`,
-          }
+            height: '4px',          }
         }}
       >
         {/* Background decorative elements */}
@@ -200,17 +238,35 @@ export const Login = () => {
             <Box component="form" onSubmit={handleSubmit} sx={{ '& > *': { mb: 2.5 } }}>
               {/* Email Field */}
               <Box>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    mb: 1,
-                    color: TEXT_COLOR,
-                    fontSize: '0.8rem',
-                    fontWeight: 500,
-                  }}
-                >
-                  Email Address
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: TEXT_COLOR,
+                      fontSize: '0.8rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Email Address
+                  </Typography>
+                  {localStorage.getItem('rememberedEmail') && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: BLUE_COLOR,
+                        fontSize: '0.7rem',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        '&:hover': {
+                          textDecoration: 'underline',
+                        },
+                      }}
+                      onClick={handleClearRememberedEmail}
+                    >
+                      Clear remembered email
+                    </Typography>
+                  )}
+                </Box>
                 <StyledTextField
                   fullWidth
                   size="small"
@@ -294,6 +350,58 @@ export const Login = () => {
                   }}
                 />
               </Box>
+
+              {/* Remember Me and Forgot Password */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={rememberMe}
+                      onChange={handleRememberMeChange}
+                      sx={{
+                        color: BLUE_COLOR,
+                        '&.Mui-checked': {
+                          color: BLUE_COLOR,
+                        },
+                        padding: '6px',
+                        '& .MuiSvgIcon-root': {
+                          fontSize: 16,
+                        },
+                      }}
+                    />
+                  }
+                  label={
+                    <Typography
+                      sx={{
+                        fontSize: '0.8rem',
+                        color: TEXT_COLOR,
+                        fontWeight: 400,
+                      }}
+                    >
+                      Remember me
+                    </Typography>
+                  }
+                />
+                {/* <Link
+                  component="button"
+                  type="button"
+                  onClick={handleForgotPassword}
+                  sx={{
+                    fontSize: '0.8rem',
+                    fontWeight: 500,
+                    color: BLUE_COLOR,
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      textDecoration: 'underline',
+                    },
+                  }}
+                >
+                  Forgot password?
+                </Link> */}
+              </Box>
+
               {/* Submit Button */}
               <GradientButton
                 type="submit"

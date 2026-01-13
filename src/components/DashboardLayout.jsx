@@ -168,7 +168,7 @@ const ScrollableBox = styled(Box)({
   scrollbarWidth: 'none',
 });
 
-// Search component styled like in the image
+// Search component with responsive behavior
 const SearchContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
@@ -176,7 +176,6 @@ const SearchContainer = styled(Box)(({ theme }) => ({
   border: '1px solid rgba(0,0,0,0.08)',
   borderRadius: '5px',
   padding: '2px 10px',
-  width: '280px',
   transition: 'all 0.2s ease',
   '&:hover': {
     borderColor: '#3182ce',
@@ -186,6 +185,22 @@ const SearchContainer = styled(Box)(({ theme }) => ({
     borderColor: '#3182ce',
     backgroundColor: '#ffffff',
     boxShadow: '0 0 0 2px rgba(49, 130, 206, 0.1)',
+  },
+  // Mobile styles
+  [theme.breakpoints.down('md')]: {
+    position: 'fixed',
+    top: 60,
+    left: 16,
+    right: 16,
+    zIndex: theme.zIndex.appBar + 1,
+    width: 'calc(100% - 32px)',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+    borderColor: '#3182ce',
+    '&:hover, &:focus-within': {
+      borderColor: '#3182ce',
+      backgroundColor: '#ffffff',
+    },
   },
 }));
 
@@ -202,21 +217,97 @@ const SearchInput = styled(InputBase)(({ theme }) => ({
       fontSize: '0.8rem',
     },
   },
+  // Mobile placeholder
+  [theme.breakpoints.down('md')]: {
+    '& .MuiInputBase-input::placeholder': {
+      fontSize: '0.85rem',
+    },
+  },
 }));
 
-// Badge styled like in the image
-const KBadge = styled(Box)(({ theme }) => ({
-  backgroundColor: '#3182ce',
-  color: '#ffffff',
-  borderRadius: '5px',
-  width: '26px',
-  height: '26px',
+// Mobile search overlay backdrop
+const MobileSearchBackdrop = styled(Box)(({ theme }) => ({
+  display: 'none',
+  [theme.breakpoints.down('md')]: {
+    display: 'block',
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: theme.zIndex.appBar,
+    backdropFilter: 'blur(2px)',
+  },
+}));
+
+// Mobile search toggle button
+const MobileSearchButton = styled(IconButton)(({ theme }) => ({
+  display: 'none',
+  [theme.breakpoints.down('md')]: {
+    display: 'flex',
+    color: '#718096',
+    backgroundColor: '#f8fafc',
+    borderRadius: '5px',
+    border: '1px solid rgba(0,0,0,0.08)',
+    width: 32,
+    height: 32,
+    '&:hover': {
+      backgroundColor: '#edf2f7',
+      color: '#3182ce',
+    },
+  },
+}));
+
+// Mobile app bar actions container
+const MobileActionsContainer = styled(Box)(({ theme }) => ({
+  [theme.breakpoints.up('md')]: {
+    display: 'none',
+  },
+  [theme.breakpoints.down('md')]: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 0.75,
+  },
+}));
+
+// Desktop app bar actions container
+const DesktopActionsContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: '0.8rem',
-  fontWeight: 600,
-  marginLeft: '10px',
+  gap: 1.5,
+  flex: 1,
+  justifyContent: 'flex-end',
+  maxWidth: '550px',
+  [theme.breakpoints.down('md')]: {
+    display: 'none',
+  },
+}));
+
+// Breadcrumb container with responsive behavior
+const BreadcrumbContainer = styled(Box)(({ theme }) => ({
+  flex: 1,
+  minWidth: 0,
+  [theme.breakpoints.down('sm')]: {
+    display: 'none',
+  },
+}));
+
+// Mobile page title
+const MobilePageTitle = styled(Typography)(({ theme }) => ({
+  display: 'none',
+  [theme.breakpoints.down('sm')]: {
+    display: 'block',
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    color: '#2d3748',
+    lineHeight: 1.2,
+    letterSpacing: '-0.01em',
+    textOverflow: 'ellipsis',
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    maxWidth: '120px',
+  },
 }));
 
 // Function to generate breadcrumb from path
@@ -267,7 +358,6 @@ const getPageTitle = (path) => {
     .join(' ');
 };
 
-// Profile Dialog Component
 // Profile Dialog Component
 const ProfileDialog = ({ open, onClose, user, userRole }) => {
   const theme = useTheme();
@@ -359,6 +449,10 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
           borderRadius: '8px',
           border: '1px solid rgba(0,0,0,0.08)',
           boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+          [theme.breakpoints.down('sm')]: {
+            margin: '16px',
+            width: 'calc(100% - 32px)',
+          },
         }
       }}
     >
@@ -429,6 +523,11 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
                 fontWeight: 600,
                 border: '4px solid #ffffff',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                [theme.breakpoints.down('sm')]: {
+                  width: 80,
+                  height: 80,
+                  fontSize: '1.5rem',
+                },
               }}
             >
               {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
@@ -441,6 +540,10 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
             fontSize: '1.25rem',
             fontWeight: 600,
             mb: 0.5,
+            textAlign: 'center',
+            [theme.breakpoints.down('sm')]: {
+              fontSize: '1.1rem',
+            },
           }}>
             {user?.name || 'Jenny Wilson'}
           </Typography>
@@ -471,6 +574,9 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
           borderRadius: '8px',
           p: 2.5,
           mb: 2,
+          [theme.breakpoints.down('sm')]: {
+            p: 2,
+          },
         }}>
           <Typography variant="subtitle2" sx={{
             color: '#4a5568',
@@ -503,6 +609,7 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
                   color: '#1a202c',
                   fontSize: '0.85rem',
                   fontWeight: 500,
+                  wordBreak: 'break-word',
                 }}>
                   {user?.email || 'jennywilson@gmail.com'}
                 </Typography>
@@ -598,11 +705,14 @@ export default function DashboardLayout({ children, title, menuItems }) {
   const navigate = useNavigate();
 
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
   const [open, setOpen] = React.useState(!isMobile);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
   const [drawerMenuAnchorEl, setDrawerMenuAnchorEl] = React.useState(null);
   const [profileDialogOpen, setProfileDialogOpen] = React.useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
 
   React.useEffect(() => {
     setOpen(!isMobile);
@@ -615,6 +725,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
 
   // Generate breadcrumb from current path
   const breadcrumbItems = generateBreadcrumb(location.pathname);
+  const pageTitle = getPageTitle(location.pathname);
 
   // Get user role from localStorage or user object
   const getUserRole = () => {
@@ -750,6 +861,14 @@ export default function DashboardLayout({ children, title, menuItems }) {
 
   const handleProfileDialogClose = () => {
     setProfileDialogOpen(false);
+  };
+
+  const toggleMobileSearch = () => {
+    setMobileSearchOpen(!mobileSearchOpen);
+  };
+
+  const handleMobileSearchClose = () => {
+    setMobileSearchOpen(false);
   };
 
   const renderDrawerContent = () => (
@@ -1216,12 +1335,17 @@ export default function DashboardLayout({ children, title, menuItems }) {
     <Box sx={{ display: 'flex', minHeight: '100vh', overflow: 'hidden' }}>
       <CssBaseline />
 
+      {/* Mobile search backdrop */}
+      {mobileSearchOpen && (
+        <MobileSearchBackdrop onClick={handleMobileSearchClose} />
+      )}
+
       {/* AppBar */}
       <AppBar
         position="fixed"
         open={open && !isMobile}
         sx={{
-          zIndex: theme.zIndex.drawer + 1,
+          zIndex: theme.zIndex.drawer + (mobileSearchOpen ? 2 : 1),
           backgroundColor: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(10px)',
           boxShadow: 0.5,
@@ -1230,10 +1354,12 @@ export default function DashboardLayout({ children, title, menuItems }) {
       >
         <Toolbar sx={{
           minHeight: 56,
-          px: { xs: 1.25, sm: 2.5 },
+          px: { xs: 3, sm: 2.5 },
+          py: { xs: 2, sm: 0 },
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: 1.5,
         }}>
           {/* Left section with menu toggle and breadcrumb */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -1281,8 +1407,13 @@ export default function DashboardLayout({ children, title, menuItems }) {
               </IconButton>
             )}
 
-            {/* Dynamic Breadcrumb section with Lucide ChevronRight */}
-            <Box>
+            {/* Mobile page title */}
+            <MobilePageTitle>
+              {pageTitle}
+            </MobilePageTitle>
+
+            {/* Desktop breadcrumb */}
+            <BreadcrumbContainer>
               <Typography
                 variant="h6"
                 noWrap
@@ -1343,26 +1474,20 @@ export default function DashboardLayout({ children, title, menuItems }) {
                   </React.Fragment>
                 ))}
               </Typography>
-            </Box>
+            </BreadcrumbContainer>
           </Box>
 
-          {/* Right section with search and icons */}
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.5,
-            flex: 1,
-            justifyContent: 'flex-end',
-            maxWidth: '550px'
-          }}>
-            {/* Search Container - styled like in the image */}
-            <SearchContainer>
+          {/* Desktop Actions */}
+          <DesktopActionsContainer>
+            {/* Search Container - only visible on desktop */}
+            <SearchContainer sx={{ width: '280px' }}>
               <Search size={16} color="#a0aec0" />
               <SearchInput
                 placeholder="Q Search"
                 inputProps={{ 'aria-label': 'search' }}
               />
             </SearchContainer>
+
             {/* Notification icon */}
             <IconButton
               sx={{
@@ -1392,6 +1517,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
                 <Bell size={16} />
               </Badge>
             </IconButton>
+
             {/* User avatar with menu */}
             <IconButton
               onClick={handleMenuOpen}
@@ -1505,9 +1631,218 @@ export default function DashboardLayout({ children, title, menuItems }) {
                 <Typography sx={{ fontSize: '0.8rem' }}>Logout</Typography>
               </MenuItem>
             </Menu>
-          </Box>
+          </DesktopActionsContainer>
+
+          {/* Mobile Actions */}
+          <MobileActionsContainer>
+            {/* Mobile search toggle */}
+            <MobileSearchButton onClick={toggleMobileSearch}>
+              <Search size={16} />
+            </MobileSearchButton>
+
+            {/* Notification icon */}
+            <IconButton
+              sx={{
+                color: '#718096',
+                backgroundColor: '#f8fafc',
+                borderRadius: '5px',
+                border: '1px solid rgba(0,0,0,0.08)',
+                width: 32,
+                height: 32,
+                '&:hover': {
+                  backgroundColor: '#edf2f7',
+                  color: '#3182ce',
+                },
+              }}
+            >
+              <Badge
+                badgeContent={3}
+                color="error"
+                sx={{
+                  '& .MuiBadge-badge': {
+                    fontSize: '0.55rem',
+                    height: '14px',
+                    minWidth: '14px',
+                  }
+                }}
+              >
+                <Bell size={16} />
+              </Badge>
+            </IconButton>
+
+            {/* User avatar with menu */}
+            <IconButton
+              onClick={handleMenuOpen}
+              sx={{
+                p: 0.5,
+                borderRadius: '5px',
+                border: '1px solid rgba(0,0,0,0.08)',
+                backgroundColor: '#f8fafc',
+                '&:hover': {
+                  backgroundColor: '#edf2f7',
+                },
+              }}
+            >
+              <Avatar
+                sx={{
+                  width: 28,
+                  height: 28,
+                  bgcolor: '#3182ce',
+                  color: '#ffffff',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                }}
+              >
+                {getInitials(user?.name)}
+              </Avatar>
+            </IconButton>
+
+            <Menu
+              anchorEl={menuAnchorEl}
+              open={Boolean(menuAnchorEl)}
+              onClose={handleMenuClose}
+              PaperProps={{
+                sx: {
+                  mt: 0.5,
+                  minWidth: 160,
+                  backgroundColor: '#ffffff',
+                  color: '#2d3748',
+                  border: '1px solid rgba(0,0,0,0.1)',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  '& .MuiMenuItem-root': {
+                    fontSize: '0.8rem',
+                    py: 0.5,
+                    px: 1.25,
+                    color: '#4a5568',
+                    '&:hover': {
+                      backgroundColor: '#f7fafc',
+                      color: '#2d3748',
+                    },
+                    '& .MuiListItemIcon-root': {
+                      color: 'inherit',
+                      minWidth: 32,
+                    },
+                  },
+                },
+              }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <Box sx={{
+                px: 1.25,
+                py: 0.75,
+                borderBottom: '1px solid rgba(0,0,0,0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+              }}>
+                <Avatar
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    bgcolor: '#3182ce',
+                    color: '#ffffff',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  {getInitials(user?.name)}
+                </Avatar>
+                <Box>
+                  <Typography variant="subtitle2" sx={{
+                    fontWeight: 600,
+                    color: '#2d3748',
+                    fontSize: '0.8rem',
+                    lineHeight: 1.2,
+                  }}>
+                    {user?.name || 'Jenny Wilson'}
+                  </Typography>
+                  <Typography variant="caption" sx={{
+                    color: '#718096',
+                    fontSize: '0.7rem',
+                    lineHeight: 1.2,
+                  }}>
+                    {user?.email || 'jennywilson@gmail.com'}
+                  </Typography>
+                </Box>
+              </Box>
+              <MenuItem onClick={handleProfileClick}>
+                <ListItemIcon>
+                  <User size={16} />
+                </ListItemIcon>
+                <Typography sx={{ fontSize: '0.8rem' }}>Profile</Typography>
+              </MenuItem>
+              <Divider sx={{
+                my: 0.5,
+                borderColor: 'rgba(0,0,0,0.06)',
+              }} />
+              <MenuItem onClick={handleLogout}>
+                <ListItemIcon>
+                  <LogOut size={16} />
+                </ListItemIcon>
+                <Typography sx={{ fontSize: '0.8rem' }}>Logout</Typography>
+              </MenuItem>
+            </Menu>
+          </MobileActionsContainer>
         </Toolbar>
       </AppBar>
+
+      {/* Mobile Search Overlay */}
+      {mobileSearchOpen && (
+        <Box sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: theme.zIndex.appBar + 2,
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid rgba(0,0,0,0.08)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          animation: 'slideDown 0.2s ease-out',
+          '@keyframes slideDown': {
+            from: {
+              transform: 'translateY(-100%)',
+            },
+            to: {
+              transform: 'translateY(0)',
+            },
+          },
+        }}>
+          <Box sx={{
+            p: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+          }}>
+            <SearchContainer sx={{ flex: 1 }}>
+              <Search size={16} color="#a0aec0" />
+              <SearchInput
+                placeholder="Search everything..."
+                inputProps={{ 'aria-label': 'search' }}
+                autoFocus
+                onBlur={handleMobileSearchClose}
+              />
+            </SearchContainer>
+            <IconButton
+              onClick={handleMobileSearchClose}
+              sx={{
+                color: '#718096',
+                backgroundColor: '#f8fafc',
+                borderRadius: '5px',
+                border: '1px solid rgba(0,0,0,0.08)',
+                width: 32,
+                height: 32,
+                '&:hover': {
+                  backgroundColor: '#edf2f7',
+                  color: '#3182ce',
+                },
+              }}
+            >
+              <X size={16} />
+            </IconButton>
+          </Box>
+        </Box>
+      )}
 
       {/* Drawer */}
       {isMobile ? (
@@ -1520,6 +1855,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
             disableScrollLock: true,
           }}
           sx={{
+            zIndex: theme.zIndex.appBar + (mobileSearchOpen ? 2 : 1),
             '& .MuiDrawer-paper': {
               width: mobileDrawerWidth,
               backgroundImage: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
@@ -1551,6 +1887,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
           backgroundColor: '#f7fafc',
           width: '100%',
           overflow: 'hidden',
+          pt: mobileSearchOpen ? 8 : 0, // Adjust for mobile search bar
         }}
       >
         <DrawerHeader />
@@ -1561,7 +1898,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
             display: 'flex',
             flexDirection: 'column',
             p: { xs: 1.25, sm: 2 },
-            pt: { xs: 1.25, sm: 2 },
+            pt: { xs: 3, sm: 2 },
             overflow: 'hidden',
           }}
         >

@@ -25,6 +25,7 @@ import {
     DialogActions,
     InputAdornment,
     TablePagination,
+    Modal,
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { alpha } from '@mui/material/styles';
@@ -38,10 +39,7 @@ import {
     addDays,
 } from 'date-fns';
 import StyledTextField from '../../../components/ui/StyledTextField';
-import GradientButton from '../../../components/ui/GradientButton';
-import OutlineButton from '../../../components/ui/OutlineButton';
 
-// Import Lucide React icons
 import {
     RefreshCw,
     CheckCircle,
@@ -49,41 +47,42 @@ import {
     Timer,
     Mail,
     User,
-    Tag,
     X,
     Trash2,
     Search,
     AlertCircle,
-    Phone,
-    Calendar,
-    MapPin,
-    ChevronRight,
-    UserCog,
-    Shield,
     PhoneCall,
     AlertTriangle,
+    CheckCheck,
+    RotateCcw,
 } from 'lucide-react';
 
-// ── Constants ──
 const TEXT_COLOR = '#0F1115';
 const BLUE_COLOR = '#1976d2';
 const GREEN_COLOR = '#10b981';
 const RED_COLOR = '#ef4444';
 const ORANGE_COLOR = '#ed6c02';
 const GRAY_COLOR = '#6b7280';
+const PURPLE_COLOR = '#8b5cf6';
 
-// ── Utility function ──
 const formatDate = (dateString) => {
     if (!dateString) return '—';
     try {
         return format(new Date(dateString), 'MMM dd, yyyy HH:mm');
     } catch (e) {
-        console.warn('Invalid date format:', dateString);
         return '—';
     }
 };
 
-// Format emergency countdown
+const formatDateShort = (dateString) => {
+    if (!dateString) return '—';
+    try {
+        return format(new Date(dateString), 'MMM dd, HH:mm');
+    } catch (e) {
+        return '—';
+    }
+};
+
 const formatEmergencyCountdown = (remainingMs) => {
     const hours = Math.floor(remainingMs / (1000 * 60 * 60));
     const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -98,7 +97,6 @@ const formatEmergencyCountdown = (remainingMs) => {
     }
 };
 
-// Calculate business days remaining
 const getBusinessDaysRemaining = (endDate) => {
     const now = new Date();
     const end = new Date(endDate);
@@ -108,12 +106,10 @@ const getBusinessDaysRemaining = (endDate) => {
     let current = new Date(now);
     let businessDays = 0;
 
-    // Move to next day if we're past business hours (5 PM)
     if (current.getHours() >= 17) {
         current = addDays(current, 1);
     }
 
-    // Set to start of next business day
     current.setHours(8, 0, 0, 0);
 
     while (current < end) {
@@ -145,36 +141,14 @@ const parseDashboardAddress = (fullAddress) => {
     };
 };
 
-// Function to get user data from localStorage
-const getUserDataFromStorage = () => {
-    try {
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            const parsed = JSON.parse(userData);
-            return {
-                name: parsed.name || parsed.fullName || parsed.displayName || '',
-                email: parsed.email || '',
-            };
-        }
-    } catch (error) {
-        console.error('Error parsing user data from localStorage:', error);
-    }
-    return { name: '', email: '' };
-};
-
 const Locates = () => {
     const queryClient = useQueryClient();
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Get user data from localStorage
-    const userData = getUserDataFromStorage();
-
-    // Selection states
     const [selectedExcavator, setSelectedExcavator] = useState(new Set());
     const [selectedInProgress, setSelectedInProgress] = useState(new Set());
     const [selectedCompleted, setSelectedCompleted] = useState(new Set());
 
-    // Pagination states
     const [pageExcavator, setPageExcavator] = useState(0);
     const [rowsPerPageExcavator, setRowsPerPageExcavator] = useState(10);
     const [pageInProgress, setPageInProgress] = useState(0);
@@ -182,29 +156,34 @@ const Locates = () => {
     const [pageCompleted, setPageCompleted] = useState(0);
     const [rowsPerPageCompleted, setRowsPerPageCompleted] = useState(10);
 
-    // Dialogs
-    const [tagDialogOpen, setTagDialogOpen] = useState(false);
-    const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [selectedForDeletion, setSelectedForDeletion] = useState(new Set());
     const [deletionSection, setDeletionSection] = useState('');
-    const [selectedForTagging, setSelectedForTagging] = useState([]);
-    const [tagForm, setTagForm] = useState({
-        name: userData.name,
-        email: userData.email,
-        tags: 'Locates Needed',
-    });
+    const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+    const [selectedForCompletion, setSelectedForCompletion] = useState(new Set());
     const [searchTerm, setSearchTerm] = useState('');
-    const [showOnlyUntagged, setShowOnlyUntagged] = useState(false);
 
-    // Snackbar state
+    const [recycleBinOpen, setRecycleBinOpen] = useState(false);
+    const [recycleBinSearch, setRecycleBinSearch] = useState('');
+    const [recycleBinPage, setRecycleBinPage] = useState(0);
+    const [recycleBinRowsPerPage, setRecycleBinRowsPerPage] = useState(10);
+    const [selectedRecycleBinItems, setSelectedRecycleBinItems] = useState(new Set());
+    const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+    const [permanentDeleteDialogOpen, setPermanentDeleteDialogOpen] = useState(false);
+    const [singleRestoreDialogOpen, setSingleRestoreDialogOpen] = useState(false);
+    const [singleDeleteDialogOpen, setSingleDeleteDialogOpen] = useState(false);
+    const [selectedSingleItem, setSelectedSingleItem] = useState(null);
+    const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
+
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: '',
         severity: 'success',
     });
 
-    // Update current time every second for countdown
+    // Real-time updates for recycle bin count
+    const [recycleBinCount, setRecycleBinCount] = useState(0);
+
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date());
@@ -213,27 +192,43 @@ const Locates = () => {
         return () => clearInterval(timer);
     }, []);
 
-    // ── Data Fetching ──
+    // Optimized query with polling for real-time updates
     const { data: rawData = [], isLoading, refetch } = useQuery({
         queryKey: ['locates-all'],
         queryFn: async () => {
             const res = await axiosInstance.get('/all-locates');
             return Array.isArray(res.data) ? res.data : res.data?.data || [];
         },
-        staleTime: 3 * 60 * 1000,
+        staleTime: 30000, // 30 seconds
+        refetchInterval: 60000, // Refetch every minute for real-time updates
     });
 
-    // ── Mutations ──
+    // Optimized recycle bin query with polling
+    const { data: deletedHistoryData = {}, isLoading: isRecycleBinLoading, refetch: refetchRecycleBin } = useQuery({
+        queryKey: ['locates-deleted-history'],
+        queryFn: async () => {
+            const res = await axiosInstance.get('/deleted-history');
+            return res.data || {};
+        },
+        staleTime: 30000,
+        refetchInterval: 60000,
+    });
+
+    // Update recycle bin count whenever data changes
+    useEffect(() => {
+        if (deletedHistoryData.data) {
+            const filtered = deletedHistoryData.data.filter(item => !item.isPermanentlyDeleted);
+            setRecycleBinCount(filtered.length);
+        }
+    }, [deletedHistoryData]);
+
     const invalidateAndRefetch = () => {
         queryClient.invalidateQueries({ queryKey: ['locates-all'] });
-        queryClient.refetchQueries({ queryKey: ['locates-all'] });
+        queryClient.invalidateQueries({ queryKey: ['locates-deleted-history'] });
     };
 
     const markCalledMutation = useMutation({
         mutationFn: async ({ id, callType }) => {
-            console.log('=== FRONTEND DEBUG ===');
-            console.log('Marking as called:', { id, callType });
-
             const response = await axiosInstance.patch(
                 `/work-order/${id}/update-call-status`,
                 {
@@ -242,23 +237,18 @@ const Locates = () => {
                     calledAt: new Date().toISOString(),
                 }
             );
-
-            console.log('Response received:', response.data);
             return response;
         },
-        onSuccess: (response) => {
-            console.log('Mutation success:', response.data);
+        onSuccess: () => {
             invalidateAndRefetch();
             showSnackbar('Locate call status updated', 'success');
         },
         onError: (err) => {
-            console.error('Mutation error:', err);
-            console.error('Error response:', err.response?.data);
             showSnackbar(err?.response?.data?.message || 'Update failed', 'error');
         },
     });
 
-    const deleteBulkMutation = useMutation({
+    const softDeleteBulkMutation = useMutation({
         mutationFn: (ids) =>
             axiosInstance.delete('/work-order/bulk-delete', { data: { ids: Array.from(ids) } }),
         onSuccess: () => {
@@ -266,64 +256,138 @@ const Locates = () => {
             setSelectedExcavator(new Set());
             setSelectedInProgress(new Set());
             setSelectedCompleted(new Set());
-            showSnackbar('Selected items deleted', 'success');
+            if (recycleBinOpen) {
+                refetchRecycleBin();
+            }
+            showSnackbar('Selected items moved to recycle bin', 'success');
         },
         onError: (err) => showSnackbar(err?.response?.data?.message || 'Delete failed', 'error'),
     });
 
-    // ── Tagging Mutations ──
-    const tagLocatesNeededMutation = useMutation({
-        mutationFn: async ({ workOrderNumber, name, email, tags }) => {
-            const response = await axiosInstance.post('/tag-locates-needed', {
-                workOrderNumber,
-                name,
-                email,
-                tags,
-            });
-            return response.data;
+    const completeWorkOrderManuallyMutation = useMutation({
+        mutationFn: async (id) => {
+            const response = await axiosInstance.patch(`/work-order/${id}/complete`);
+            return response;
         },
-        onSuccess: (data) => {
+        onSuccess: () => {
             invalidateAndRefetch();
-            setTagDialogOpen(false);
-            setTagForm({
-                name: userData.name,
-                email: userData.email,
-                tags: 'Locates Needed',
-            });
-            showSnackbar(data.message || 'Work order tagged successfully', 'success');
+            setSelectedForCompletion(new Set());
+            setSelectedInProgress(new Set());
+            showSnackbar('Work order marked as complete', 'success');
         },
         onError: (err) => {
-            showSnackbar(err?.response?.data?.message || 'Tagging failed', 'error');
+            showSnackbar(err?.response?.data?.message || 'Manual completion failed', 'error');
         },
     });
 
-    const bulkTagLocatesNeededMutation = useMutation({
-        mutationFn: async ({ workOrderNumbers, name, email, tags }) => {
-            const response = await axiosInstance.post('/bulk-tag-locates-needed', {
-                workOrderNumbers,
-                name,
-                email,
-                tags,
-            });
-            return response.data;
+    const bulkCompleteWorkOrdersMutation = useMutation({
+        mutationFn: async (ids) => {
+            const promises = Array.from(ids).map(id =>
+                axiosInstance.patch(`/work-order/${id}/complete`)
+            );
+            const responses = await Promise.all(promises);
+            return responses;
         },
-        onSuccess: (data) => {
+        onSuccess: (responses) => {
             invalidateAndRefetch();
-            setBulkTagDialogOpen(false);
-            setSelectedExcavator(new Set());
-            setTagForm({
-                name: userData.name,
-                email: userData.email,
-                tags: 'Locates Needed',
-            });
-            showSnackbar(data.message || 'Bulk tagging completed', 'success');
+            setSelectedForCompletion(new Set());
+            setSelectedInProgress(new Set());
+            showSnackbar(`${responses.length} work order(s) marked as complete`, 'success');
         },
         onError: (err) => {
-            showSnackbar(err?.response?.data?.message || 'Bulk tagging failed', 'error');
+            showSnackbar(err?.response?.data?.message || 'Bulk completion failed', 'error');
         },
     });
 
-    // ── Data Processing ──
+    const restoreFromRecycleBinMutation = useMutation({
+        mutationFn: async ({ dashboardId, deletedOrderId }) => {
+            const response = await axiosInstance.post(
+                `/history/${dashboardId}/${deletedOrderId}/restore`
+            );
+            return response;
+        },
+        onSuccess: () => {
+            invalidateAndRefetch();
+            refetchRecycleBin();
+            setSelectedRecycleBinItems(new Set());
+            setSingleRestoreDialogOpen(false);
+            showSnackbar('Item restored successfully', 'success');
+        },
+        onError: (err) => {
+            showSnackbar(err?.response?.data?.message || 'Restore failed', 'error');
+        },
+    });
+
+    const bulkRestoreMutation = useMutation({
+        mutationFn: async (items) => {
+            const promises = items.map(item =>
+                axiosInstance.post(`/history/${item.dashboardId}/${item.deletedOrderId}/restore`)
+            );
+            const responses = await Promise.all(promises);
+            return responses;
+        },
+        onSuccess: (responses) => {
+            invalidateAndRefetch();
+            refetchRecycleBin();
+            setSelectedRecycleBinItems(new Set());
+            showSnackbar(`${responses.length} item(s) restored`, 'success');
+        },
+        onError: (err) => {
+            showSnackbar(err?.response?.data?.message || 'Bulk restore failed', 'error');
+        },
+    });
+
+    const permanentDeleteFromRecycleBinMutation = useMutation({
+        mutationFn: async ({ dashboardId, deletedOrderId }) => {
+            const response = await axiosInstance.delete(
+                `/history/${dashboardId}/${deletedOrderId}/permanent`
+            );
+            return response;
+        },
+        onSuccess: () => {
+            refetchRecycleBin();
+            setSelectedRecycleBinItems(new Set());
+            setSingleDeleteDialogOpen(false);
+            showSnackbar('Item permanently deleted', 'success');
+        },
+        onError: (err) => {
+            showSnackbar(err?.response?.data?.message || 'Permanent delete failed', 'error');
+        },
+    });
+
+    const bulkPermanentDeleteMutation = useMutation({
+        mutationFn: async (items) => {
+            const response = await axiosInstance.delete('/history/bulk-permanent-delete', {
+                data: { items }
+            });
+            return response;
+        },
+        onSuccess: (response) => {
+            refetchRecycleBin();
+            setSelectedRecycleBinItems(new Set());
+            showSnackbar(`${response.data.deletedCount} item(s) permanently deleted`, 'success');
+        },
+        onError: (err) => {
+            showSnackbar(err?.response?.data?.message || 'Bulk permanent delete failed', 'error');
+        },
+    });
+
+    const clearAllRecycleBinMutation = useMutation({
+        mutationFn: async () => {
+            const response = await axiosInstance.delete('/history/clear-all');
+            return response;
+        },
+        onSuccess: () => {
+            refetchRecycleBin();
+            setSelectedRecycleBinItems(new Set());
+            setClearAllDialogOpen(false);
+            showSnackbar('Recycle bin cleared', 'success');
+        },
+        onError: (err) => {
+            showSnackbar(err?.response?.data?.message || 'Clear all failed', 'error');
+        },
+    });
+
     const processed = useMemo(() => {
         return rawData
             .flatMap(item => item.workOrders || [])
@@ -338,11 +402,8 @@ const Locates = () => {
                 let timeRemainingColor = TEXT_COLOR;
                 let isExpired = false;
 
-                // Extract called by information
                 const calledByName = wo.calledBy || wo.metadata?.updatedBy || '';
                 const calledByEmail = wo.calledByEmail || '';
-                const taggedByName = wo.taggedBy || '';
-                const taggedByEmail = wo.taggedByEmail || '';
 
                 if (wo.locatesCalled && wo.calledAt && wo.callType) {
                     const called = new Date(wo.calledAt);
@@ -354,7 +415,6 @@ const Locates = () => {
 
                     if (!isExpired) {
                         if (wo.callType === 'EMERGENCY') {
-                            // Emergency: 4 hours from called time
                             const totalMs = 4 * 60 * 60 * 1000;
                             const elapsedMs = now.getTime() - called.getTime();
                             const remainingMs = Math.max(0, totalMs - elapsedMs);
@@ -362,7 +422,6 @@ const Locates = () => {
                             timeRemainingText = formatEmergencyCountdown(remainingMs);
                             timeRemainingDetail = `Expires at: ${format(completionDate, 'MMM dd, HH:mm:ss')}`;
 
-                            // Color coding for emergency
                             if (remainingMs <= 30 * 60 * 1000) {
                                 timeRemainingColor = RED_COLOR;
                             } else if (remainingMs <= 60 * 60 * 1000) {
@@ -371,10 +430,7 @@ const Locates = () => {
                                 timeRemainingColor = BLUE_COLOR;
                             }
                         } else {
-                            // Standard: 2 business days
                             const businessInfo = getBusinessDaysRemaining(completionDate);
-
-                            // Check if it's a business day
                             const now = new Date();
                             const isBusinessDay = !isWeekend(now);
 
@@ -389,7 +445,6 @@ const Locates = () => {
 
                             timeRemainingDetail = `Expires: ${format(completionDate, 'MMM dd, yyyy')}`;
 
-                            // Color coding for standard
                             if (businessInfo.days === 0) {
                                 timeRemainingColor = ORANGE_COLOR;
                             } else if (businessInfo.days <= 1) {
@@ -419,8 +474,6 @@ const Locates = () => {
                     callType: wo.callType || null,
                     calledByName,
                     calledByEmail,
-                    taggedByName,
-                    taggedByEmail,
                     calledAt: wo.calledAt,
                     completionDate: completionDate,
                     priorityName: wo.priorityName || 'Standard',
@@ -430,16 +483,54 @@ const Locates = () => {
                     timeRemainingText,
                     timeRemainingDetail,
                     timeRemainingColor,
-                    tags: wo.tags || '',
-                    manuallyTagged: wo.manuallyTagged || false,
+                    workflowStatus: wo.workflowStatus || 'UNKNOWN',
                 };
             });
     }, [rawData, currentTime]);
 
+    const recycleBinItems = useMemo(() => {
+        const data = deletedHistoryData.data || [];
+        const extractedData = data.map(item => {
+            const actualData = item._doc ? item._doc : item;
+            const dashboardId = item.dashboardId || actualData.dashboardId ||
+                (item.$__parent ? item.$__parent._id : null);
+            const dashboardName = item.dashboardName || actualData.dashboardName ||
+                (item.$__parent ? `Dashboard ${item.$__parent._id}` : 'Unknown Dashboard');
+
+            return {
+                ...actualData,
+                dashboardId: dashboardId,
+                dashboardName: dashboardName,
+                deletedOrderId: actualData._id || item._id,
+                workOrderNumber: actualData.workOrderNumber || item.workOrderNumber,
+                customerName: actualData.customerName || item.customerName,
+                customerAddress: actualData.customerAddress || item.customerAddress,
+                deletedBy: actualData.deletedBy || item.deletedBy,
+                deletedByEmail: actualData.deletedByEmail || item.deletedByEmail,
+                deletedAt: actualData.deletedAt || item.deletedAt,
+                deletedFrom: actualData.deletedFrom || item.deletedFrom,
+                isPermanentlyDeleted: actualData.isPermanentlyDeleted || item.isPermanentlyDeleted || false,
+            };
+        });
+
+        const filtered = extractedData.filter(item => !item.isPermanentlyDeleted);
+        let searchFiltered = [...filtered];
+        if (recycleBinSearch) {
+            const searchLower = recycleBinSearch.toLowerCase();
+            searchFiltered = searchFiltered.filter(item =>
+                (item.workOrderNumber?.toLowerCase() || '').includes(searchLower) ||
+                (item.customerName?.toLowerCase() || '').includes(searchLower) ||
+                (item.customerAddress?.toLowerCase() || '').includes(searchLower) ||
+                (item.deletedBy?.toLowerCase() || '').includes(searchLower) ||
+                (item.deletedFrom?.toLowerCase() || '').includes(searchLower)
+            );
+        }
+
+        return searchFiltered;
+    }, [deletedHistoryData.data, recycleBinSearch]);
+
     const excavatorPending = useMemo(() => {
         let filtered = processed.filter(l => l.needsCall && !l.locatesCalled);
-
-        // Apply search filter
         if (searchTerm) {
             const searchLower = searchTerm.toLowerCase();
             filtered = filtered.filter(l =>
@@ -450,22 +541,15 @@ const Locates = () => {
                 l.techName?.toLowerCase().includes(searchLower)
             );
         }
-
-        // Apply "Show Only Untagged" filter
-        if (showOnlyUntagged) {
-            filtered = filtered.filter(l => !l.manuallyTagged);
-        }
-
         return filtered;
-    }, [processed, searchTerm, showOnlyUntagged]);
+    }, [processed, searchTerm]);
 
     const inProgress = useMemo(() =>
-        processed.filter(l => l.locatesCalled && !l.isExpired), [processed]);
+        processed.filter(l => l.locatesCalled && !l.isExpired && l.workflowStatus !== 'COMPLETE'), [processed]);
 
     const completed = useMemo(() =>
-        processed.filter(l => l.locatesCalled && l.isExpired), [processed]);
+        processed.filter(l => (l.locatesCalled && l.isExpired) || l.workflowStatus === 'COMPLETE'), [processed]);
 
-    // ── Pagination Handlers ──
     const handleChangePageExcavator = (event, newPage) => {
         setPageExcavator(newPage);
     };
@@ -493,7 +577,15 @@ const Locates = () => {
         setPageCompleted(0);
     };
 
-    // ── Helpers ──
+    const handleChangeRecycleBinPage = (event, newPage) => {
+        setRecycleBinPage(newPage);
+    };
+
+    const handleChangeRecycleBinRowsPerPage = (event) => {
+        setRecycleBinRowsPerPage(parseInt(event.target.value, 10));
+        setRecycleBinPage(0);
+    };
+
     const showSnackbar = (message, severity = 'success') => {
         setSnackbar({ open: true, message, severity });
     };
@@ -509,18 +601,126 @@ const Locates = () => {
         markCalledMutation.mutate({ id, callType });
     };
 
-    const confirmBulkDelete = (selectionSet, section) => {
-        if (selectionSet.size === 0) return;
+    const handleManualCompletion = (id) => {
+        completeWorkOrderManuallyMutation.mutate(id);
+    };
 
+    const confirmBulkComplete = () => {
+        if (selectedInProgress.size === 0) return;
+        setSelectedForCompletion(selectedInProgress);
+        setCompleteDialogOpen(true);
+    };
+
+    const executeBulkComplete = () => {
+        bulkCompleteWorkOrdersMutation.mutate(selectedForCompletion);
+        setCompleteDialogOpen(false);
+    };
+
+    const confirmSoftDelete = (selectionSet, section) => {
+        if (selectionSet.size === 0) return;
         setSelectedForDeletion(selectionSet);
         setDeletionSection(section);
         setDeleteDialogOpen(true);
     };
 
-    const executeBulkDelete = () => {
-        deleteBulkMutation.mutate(selectedForDeletion);
+    const executeSoftDelete = () => {
+        softDeleteBulkMutation.mutate(selectedForDeletion);
         setDeleteDialogOpen(false);
         setSelectedForDeletion(new Set());
+    };
+
+    const toggleRecycleBinSelection = (itemKey) => {
+        setSelectedRecycleBinItems(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(itemKey)) newSet.delete(itemKey);
+            else newSet.add(itemKey);
+            return newSet;
+        });
+    };
+
+    const toggleAllRecycleBinSelection = () => {
+        const currentPageItems = recycleBinItems.slice(
+            recycleBinPage * recycleBinRowsPerPage,
+            recycleBinPage * recycleBinRowsPerPage + recycleBinRowsPerPage
+        );
+
+        const allPageIds = new Set(currentPageItems.map(item => `${item.dashboardId}_${item.deletedOrderId}`));
+        const currentSelected = new Set(selectedRecycleBinItems);
+        const allSelectedOnPage = Array.from(allPageIds).every(id => currentSelected.has(id));
+
+        if (allSelectedOnPage) {
+            const newSet = new Set(currentSelected);
+            allPageIds.forEach(id => newSet.delete(id));
+            return newSet;
+        } else {
+            const newSet = new Set([...currentSelected, ...allPageIds]);
+            return newSet;
+        }
+    };
+
+    const confirmBulkRestore = () => {
+        if (selectedRecycleBinItems.size === 0) return;
+        setRestoreDialogOpen(true);
+    };
+
+    const executeBulkRestore = () => {
+        const itemsToRestore = Array.from(selectedRecycleBinItems).map(itemKey => {
+            const [dashboardId, deletedOrderId] = itemKey.split('_');
+            return { dashboardId, deletedOrderId };
+        });
+        bulkRestoreMutation.mutate(itemsToRestore);
+        setRestoreDialogOpen(false);
+    };
+
+    const confirmBulkPermanentDelete = () => {
+        if (selectedRecycleBinItems.size === 0) return;
+        setPermanentDeleteDialogOpen(true);
+    };
+
+    const executeBulkPermanentDelete = () => {
+        const itemsToDelete = Array.from(selectedRecycleBinItems).map(itemKey => {
+            const [dashboardId, deletedOrderId] = itemKey.split('_');
+            return { dashboardId, deletedOrderId };
+        });
+        bulkPermanentDeleteMutation.mutate(itemsToDelete);
+        setPermanentDeleteDialogOpen(false);
+    };
+
+    const confirmClearAllRecycleBin = () => {
+        if (recycleBinItems.length === 0) return;
+        setClearAllDialogOpen(true);
+    };
+
+    const executeClearAllRecycleBin = () => {
+        clearAllRecycleBinMutation.mutate();
+    };
+
+    const handleSingleRestore = (item) => {
+        setSelectedSingleItem(item);
+        setSingleRestoreDialogOpen(true);
+    };
+
+    const handleSinglePermanentDelete = (item) => {
+        setSelectedSingleItem(item);
+        setSingleDeleteDialogOpen(true);
+    };
+
+    const executeSingleRestore = () => {
+        if (selectedSingleItem) {
+            restoreFromRecycleBinMutation.mutate({
+                dashboardId: selectedSingleItem.dashboardId,
+                deletedOrderId: selectedSingleItem.deletedOrderId
+            });
+        }
+    };
+
+    const executeSinglePermanentDelete = () => {
+        if (selectedSingleItem) {
+            permanentDeleteFromRecycleBinMutation.mutate({
+                dashboardId: selectedSingleItem.dashboardId,
+                deletedOrderId: selectedSingleItem.deletedOrderId
+            });
+        }
     };
 
     const toggleSelection = (setState, id) => {
@@ -535,86 +735,15 @@ const Locates = () => {
     const toggleAllSelection = (setState, items, pageItems) => {
         const allPageIds = new Set(pageItems.map(item => item.id));
         const currentSelected = new Set(setState);
-
-        // Check if all page items are selected
         const allSelectedOnPage = Array.from(allPageIds).every(id => currentSelected.has(id));
 
         if (allSelectedOnPage) {
-            // Deselect all page items
             const newSet = new Set(currentSelected);
             allPageIds.forEach(id => newSet.delete(id));
             return newSet;
         } else {
-            // Select all page items
             const newSet = new Set([...currentSelected, ...allPageIds]);
             return newSet;
-        }
-    };
-
-    // Tagging functions
-    const openTagDialog = (item) => {
-        setSelectedForTagging([item]);
-        setTagForm({
-            name: userData.name,
-            email: userData.email,
-            tags: item.tags || 'Locates Needed',
-        });
-        setTagDialogOpen(true);
-    };
-
-    const openBulkTagDialog = () => {
-        const selectedItems = Array.from(selectedExcavator)
-            .map(id => excavatorPending.find(item => item.id === id))
-            .filter(Boolean);
-
-        if (selectedItems.length === 0) {
-            showSnackbar('Please select items to tag', 'warning');
-            return;
-        }
-
-        setSelectedForTagging(selectedItems);
-        setTagForm({
-            name: userData.name,
-            email: userData.email,
-            tags: 'Locates Needed',
-        });
-        setBulkTagDialogOpen(true);
-    };
-
-    const handleTagSubmit = () => {
-        if (!tagForm.name.trim() || !tagForm.email.trim()) {
-            showSnackbar('Name and email are required', 'error');
-            return;
-        }
-
-        if (bulkTagDialogOpen) {
-            // Bulk tagging
-            const workOrderNumbers = selectedForTagging.map(item => item.workOrderNumber).filter(Boolean);
-            if (workOrderNumbers.length === 0) {
-                showSnackbar('No valid work order numbers found', 'error');
-                return;
-            }
-
-            bulkTagLocatesNeededMutation.mutate({
-                workOrderNumbers,
-                name: tagForm.name,
-                email: tagForm.email,
-                tags: tagForm.tags,
-            });
-        } else {
-            // Single tagging
-            const item = selectedForTagging[0];
-            if (!item?.workOrderNumber) {
-                showSnackbar('Invalid work order', 'error');
-                return;
-            }
-
-            tagLocatesNeededMutation.mutate({
-                workOrderNumber: item.workOrderNumber,
-                name: tagForm.name,
-                email: tagForm.email,
-                tags: tagForm.tags,
-            });
         }
     };
 
@@ -632,7 +761,6 @@ const Locates = () => {
         );
     }
 
-    // Get paginated data for each section
     const excavatorPageItems = excavatorPending.slice(
         pageExcavator * rowsPerPageExcavator,
         pageExcavator * rowsPerPageExcavator + rowsPerPageExcavator
@@ -648,9 +776,13 @@ const Locates = () => {
         pageCompleted * rowsPerPageCompleted + rowsPerPageCompleted
     );
 
+    const recycleBinPageItems = recycleBinItems.slice(
+        recycleBinPage * recycleBinRowsPerPage,
+        recycleBinPage * recycleBinRowsPerPage + recycleBinRowsPerPage
+    );
+
     return (
         <Box>
-            {/* Header */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
                     <Typography
@@ -675,18 +807,32 @@ const Locates = () => {
                         Dispatch and monitor locate requests efficiently
                     </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                    {/* Sync Dashboard button has been removed */}
-                </Box>
+                <Button
+                    variant="outlined"
+                    startIcon={<Trash2 size={16} />}
+                    onClick={() => setRecycleBinOpen(true)}
+                    sx={{
+                        textTransform: 'none',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        color: PURPLE_COLOR,
+                        borderColor: alpha(PURPLE_COLOR, 0.3),
+                        '&:hover': {
+                            borderColor: PURPLE_COLOR,
+                            backgroundColor: alpha(PURPLE_COLOR, 0.05),
+                        },
+                    }}
+                >
+                    Recycle Bin ({recycleBinCount})
+                </Button>
             </Box>
 
-            {/* Excavator - Call Needed */}
             <Section
                 title="Call Needed "
                 color={ORANGE_COLOR}
                 count={excavatorPending.length}
                 selectedCount={selectedExcavator.size}
-                onDelete={() => confirmBulkDelete(selectedExcavator, 'Call Needed')}
+                onDelete={() => confirmSoftDelete(selectedExcavator, 'Call Needed')}
                 additionalActions={
                     <Stack direction="row" spacing={1} alignItems="center">
                         <StyledTextField
@@ -721,22 +867,6 @@ const Locates = () => {
                                 ),
                             }}
                         />
-                        {selectedExcavator.size > 0 && (
-                            <Button
-                                variant="contained"
-                                onClick={openBulkTagDialog}
-                                size="small"
-                                startIcon={<Tag size={14} />}
-                                sx={{
-                                    textTransform: 'none',
-                                    fontSize: '0.75rem',
-                                    height: '30px',
-                                    px: 1.5,
-                                }}
-                            >
-                                Tag ({selectedExcavator.size})
-                            </Button>
-                        )}
                     </Stack>
                 }
             >
@@ -746,11 +876,8 @@ const Locates = () => {
                     onToggleSelect={(id) => toggleSelection(setSelectedExcavator, id)}
                     onToggleAll={() => setSelectedExcavator(toggleAllSelection(selectedExcavator, excavatorPending, excavatorPageItems))}
                     onMarkCalled={handleMarkCalled}
-                    onTag={openTagDialog}
                     color={ORANGE_COLOR}
                     showCallAction
-                    showTagAction
-                    showTaggedBy
                     totalCount={excavatorPending.length}
                     page={pageExcavator}
                     rowsPerPage={rowsPerPageExcavator}
@@ -759,13 +886,38 @@ const Locates = () => {
                 />
             </Section>
 
-            {/* In Progress */}
             <Section
                 title="In Progress"
                 color={BLUE_COLOR}
                 count={inProgress.length}
                 selectedCount={selectedInProgress.size}
-                onDelete={() => confirmBulkDelete(selectedInProgress, 'In Progress')}
+                onDelete={() => confirmSoftDelete(selectedInProgress, 'In Progress')}
+                additionalActions={
+                    selectedInProgress.size > 0 ? (
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <Button
+                                variant="contained"
+                                color="success"
+                                size="small"
+                                onClick={confirmBulkComplete}
+                                startIcon={<CheckCheck size={14} />}
+                                disabled={bulkCompleteWorkOrdersMutation.isPending}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontSize: '0.75rem',
+                                    height: '30px',
+                                    px: 1.5,
+                                    bgcolor: GREEN_COLOR,
+                                    '&:hover': {
+                                        bgcolor: alpha(GREEN_COLOR, 0.9),
+                                    },
+                                }}
+                            >
+                                Complete ({selectedInProgress.size})
+                            </Button>
+                        </Stack>
+                    ) : null
+                }
                 showTimer
             >
                 <LocateTable
@@ -773,9 +925,11 @@ const Locates = () => {
                     selected={selectedInProgress}
                     onToggleSelect={(id) => toggleSelection(setSelectedInProgress, id)}
                     onToggleAll={() => setSelectedInProgress(toggleAllSelection(selectedInProgress, inProgress, inProgressPageItems))}
+                    onManualComplete={handleManualCompletion}
                     color={BLUE_COLOR}
                     showTimerColumn
                     showCalledBy
+                    showManualCompleteAction={false}
                     currentTime={currentTime}
                     totalCount={inProgress.length}
                     page={pageInProgress}
@@ -785,13 +939,12 @@ const Locates = () => {
                 />
             </Section>
 
-            {/* Completed */}
             <Section
                 title="Completed"
                 color={GREEN_COLOR}
                 count={completed.length}
                 selectedCount={selectedCompleted.size}
-                onDelete={() => confirmBulkDelete(selectedCompleted, 'Completed')}
+                onDelete={() => confirmSoftDelete(selectedCompleted, 'Completed')}
             >
                 <LocateTable
                     items={completedPageItems}
@@ -809,10 +962,412 @@ const Locates = () => {
                 />
             </Section>
 
-            {/* Delete Confirmation Dialog */}
+            <Modal
+                open={recycleBinOpen}
+                onClose={() => setRecycleBinOpen(false)}
+                aria-labelledby="recycle-bin-modal"
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}
+            >
+                <Box sx={{
+                    width: '95%',
+                    maxWidth: 1400,
+                    maxHeight: '90vh',
+                    bgcolor: 'white',
+                    borderRadius: '8px',
+                    boxShadow: 24,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}>
+                    <Box sx={{
+                        p: 2,
+                        borderBottom: `1px solid ${alpha(PURPLE_COLOR, 0.1)}`,
+                        bgcolor: alpha(PURPLE_COLOR, 0.03),
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                    }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: alpha(PURPLE_COLOR, 0.1),
+                                color: PURPLE_COLOR,
+                            }}>
+                                <Trash2 size={20} />
+                            </Box>
+                            <Box>
+                                <Typography variant="h6" sx={{
+                                    fontSize: '1rem',
+                                    fontWeight: 600,
+                                    color: TEXT_COLOR,
+                                    mb: 0.5,
+                                }}>
+                                    Recycle Bin
+                                </Typography>
+                                <Typography variant="body2" sx={{
+                                    fontSize: '0.85rem',
+                                    color: GRAY_COLOR,
+                                }}>
+                                    {recycleBinItems.length} deleted item(s) • Restore or permanently delete
+                                </Typography>
+                            </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            <IconButton
+                                size="small"
+                                onClick={() => setRecycleBinOpen(false)}
+                                sx={{
+                                    color: GRAY_COLOR,
+                                    '&:hover': {
+                                        backgroundColor: alpha(GRAY_COLOR, 0.1),
+                                    },
+                                }}
+                            >
+                                <X size={20} />
+                            </IconButton>
+                        </Box>
+                    </Box>
+
+                    <Box sx={{
+                        p: 1.5,
+                        borderBottom: `1px solid ${alpha(PURPLE_COLOR, 0.1)}`,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 2,
+                    }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <StyledTextField
+                                size="small"
+                                placeholder="Search deleted items..."
+                                value={recycleBinSearch}
+                                fullWidth
+                                onChange={(e) => setRecycleBinSearch(e.target.value)}
+                                sx={{
+                                    width: 250,
+                                    '& .MuiInputBase-root': {
+                                        fontSize: '0.8rem',
+                                    },
+                                }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Search size={16} color={GRAY_COLOR} />
+                                        </InputAdornment>
+                                    ),
+                                    endAdornment: recycleBinSearch && (
+                                        <InputAdornment position="end">
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => setRecycleBinSearch('')}
+                                                edge="end"
+                                                sx={{ p: 0.5 }}
+                                            >
+                                                <X size={16} />
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<RotateCcw size={14} />}
+                                onClick={confirmBulkRestore}
+                                disabled={selectedRecycleBinItems.size === 0 || bulkRestoreMutation.isPending}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontSize: '0.75rem',
+                                    color: GREEN_COLOR,
+                                    borderColor: alpha(GREEN_COLOR, 0.3),
+                                    '&:hover': {
+                                        borderColor: GREEN_COLOR,
+                                        backgroundColor: alpha(GREEN_COLOR, 0.05),
+                                    },
+                                }}
+                            >
+                                Restore ({selectedRecycleBinItems.size})
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<Trash2 size={14} />}
+                                onClick={confirmBulkPermanentDelete}
+                                disabled={selectedRecycleBinItems.size === 0 || bulkPermanentDeleteMutation.isPending}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontSize: '0.75rem',
+                                    color: RED_COLOR,
+                                    borderColor: alpha(RED_COLOR, 0.3),
+                                    '&:hover': {
+                                        borderColor: RED_COLOR,
+                                        backgroundColor: alpha(RED_COLOR, 0.05),
+                                    },
+                                }}
+                            >
+                                Delete ({selectedRecycleBinItems.size})
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<Trash2 size={14} />}
+                                onClick={confirmClearAllRecycleBin}
+                                disabled={recycleBinItems.length === 0 || clearAllRecycleBinMutation.isPending}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontSize: '0.75rem',
+                                    color: RED_COLOR,
+                                    borderColor: alpha(RED_COLOR, 0.3),
+                                    '&:hover': {
+                                        borderColor: RED_COLOR,
+                                        backgroundColor: alpha(RED_COLOR, 0.05),
+                                    },
+                                }}
+                            >
+                                Clear All ({recycleBinItems.length})
+                            </Button>
+                        </Box>
+                    </Box>
+
+                    <Box sx={{ flex: 1, overflow: 'auto' }}>
+                        {isRecycleBinLoading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                                <CircularProgress size={24} sx={{ color: PURPLE_COLOR }} />
+                            </Box>
+                        ) : recycleBinItems.length === 0 ? (
+                            <Box sx={{ textAlign: 'center', py: 8 }}>
+                                <Trash2 size={48} color={alpha(GRAY_COLOR, 0.3)} />
+                                <Typography variant="body2" sx={{
+                                    mt: 2,
+                                    color: GRAY_COLOR,
+                                    fontSize: '0.9rem',
+                                }}>
+                                    Recycle bin is empty
+                                </Typography>
+                                <Typography variant="caption" sx={{
+                                    color: GRAY_COLOR,
+                                    fontSize: '0.8rem',
+                                }}>
+                                    Deleted work orders will appear here
+                                </Typography>
+                            </Box>
+                        ) : (
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow sx={{
+                                            bgcolor: alpha(PURPLE_COLOR, 0.04),
+                                            '& th': {
+                                                borderBottom: `2px solid ${alpha(PURPLE_COLOR, 0.1)}`,
+                                                fontWeight: 600,
+                                                fontSize: '0.8rem',
+                                                color: TEXT_COLOR,
+                                                py: 1.5,
+                                            }
+                                        }}>
+                                            <TableCell padding="checkbox" width={50} />
+                                            <TableCell>Work Order</TableCell>
+                                            <TableCell>Customer</TableCell>
+                                            <TableCell>Address</TableCell>
+                                            <TableCell>Deleted By</TableCell>
+                                            <TableCell>Deleted At</TableCell>
+                                            <TableCell>Deleted From</TableCell>
+                                            <TableCell width={150}>Actions</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {recycleBinPageItems.map((item) => {
+                                            const itemKey = `${item.dashboardId}_${item.deletedOrderId}`;
+                                            const isSelected = selectedRecycleBinItems.has(itemKey);
+                                            const address = parseDashboardAddress(item.customerAddress || '');
+                                            const deletedBy = item.deletedBy || 'Unknown';
+                                            const deletedByEmail = item.deletedByEmail || '';
+                                            const deletedFrom = item.deletedFrom || 'Unknown';
+                                            const workOrderNumber = item.workOrderNumber || 'N/A';
+                                            const customerName = item.customerName || 'Unknown';
+                                            const type = item.type || 'STANDARD';
+
+                                            return (
+                                                <TableRow
+                                                    key={itemKey}
+                                                    hover
+                                                    sx={{
+                                                        bgcolor: isSelected ? alpha(PURPLE_COLOR, 0.1) : 'white',
+                                                        '&:hover': {
+                                                            backgroundColor: alpha(PURPLE_COLOR, 0.05),
+                                                        },
+                                                    }}
+                                                >
+                                                    <TableCell padding="checkbox">
+                                                        <Checkbox
+                                                            size="small"
+                                                            checked={isSelected}
+                                                            onChange={() => toggleRecycleBinSelection(itemKey)}
+                                                            sx={{ padding: '4px' }}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="body2" sx={{
+                                                            fontSize: '0.85rem',
+                                                            fontWeight: 500,
+                                                            color: TEXT_COLOR,
+                                                        }}>
+                                                            {workOrderNumber}
+                                                        </Typography>
+                                                        <Typography variant="caption" sx={{
+                                                            fontSize: '0.75rem',
+                                                            color: GRAY_COLOR,
+                                                        }}>
+                                                            {type}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="body2" sx={{
+                                                            fontSize: '0.85rem',
+                                                            color: TEXT_COLOR,
+                                                        }}>
+                                                            {customerName}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="body2" sx={{
+                                                            fontSize: '0.85rem',
+                                                            color: TEXT_COLOR,
+                                                            mb: 0.5,
+                                                        }}>
+                                                            {address.street || '—'}
+                                                        </Typography>
+                                                        <Typography variant="caption" sx={{
+                                                            fontSize: '0.75rem',
+                                                            color: GRAY_COLOR,
+                                                        }}>
+                                                            {[address.city, address.state, address.zip].filter(Boolean).join(', ')}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Box>
+                                                            <Typography variant="body2" sx={{
+                                                                fontSize: '0.85rem',
+                                                                color: TEXT_COLOR,
+                                                            }}>
+                                                                {deletedBy}
+                                                            </Typography>
+                                                            {deletedByEmail && (
+                                                                <Typography variant="caption" sx={{
+                                                                    fontSize: '0.75rem',
+                                                                    color: GRAY_COLOR,
+                                                                }}>
+                                                                    {deletedByEmail}
+                                                                </Typography>
+                                                            )}
+                                                        </Box>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="body2" sx={{
+                                                            fontSize: '0.85rem',
+                                                            color: TEXT_COLOR,
+                                                        }}>
+                                                            {formatDateShort(item.deletedAt)}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Chip
+                                                            label={deletedFrom}
+                                                            size="small"
+                                                            sx={{
+                                                                fontSize: '0.7rem',
+                                                                height: '20px',
+                                                                backgroundColor: alpha(PURPLE_COLOR, 0.1),
+                                                                color: PURPLE_COLOR,
+                                                                border: `1px solid ${alpha(PURPLE_COLOR, 0.2)}`,
+                                                            }}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Stack direction="row" spacing={0.5}>
+                                                            <Tooltip title="Restore">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={() => handleSingleRestore(item)}
+                                                                    disabled={restoreFromRecycleBinMutation.isPending}
+                                                                    sx={{
+                                                                        color: GREEN_COLOR,
+                                                                        '&:hover': {
+                                                                            backgroundColor: alpha(GREEN_COLOR, 0.1),
+                                                                        },
+                                                                    }}
+                                                                >
+                                                                    <RotateCcw size={16} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                            <Tooltip title="Delete Permanently">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={() => handleSinglePermanentDelete(item)}
+                                                                    disabled={permanentDeleteFromRecycleBinMutation.isPending}
+                                                                    sx={{
+                                                                        color: RED_COLOR,
+                                                                        '&:hover': {
+                                                                            backgroundColor: alpha(RED_COLOR, 0.1),
+                                                                        },
+                                                                    }}
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        </Stack>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        )}
+                    </Box>
+
+                    {recycleBinItems.length > 0 && (
+                        <Box sx={{
+                            borderTop: `1px solid ${alpha(PURPLE_COLOR, 0.1)}`,
+                            p: 1,
+                        }}>
+                            <TablePagination
+                                rowsPerPageOptions={[5, 10, 25, 50]}
+                                component="div"
+                                count={recycleBinItems.length}
+                                rowsPerPage={recycleBinRowsPerPage}
+                                page={recycleBinPage}
+                                onPageChange={handleChangeRecycleBinPage}
+                                onRowsPerPageChange={handleChangeRecycleBinRowsPerPage}
+                                sx={{
+                                    '& .MuiTablePagination-toolbar': {
+                                        minHeight: '44px',
+                                    },
+                                    '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                                        fontSize: '0.8rem',
+                                    },
+                                }}
+                            />
+                        </Box>
+                    )}
+                </Box>
+            </Modal>
+
+            {/* Clear All Recycle Bin Confirmation Dialog */}
             <Dialog
-                open={deleteDialogOpen}
-                onClose={() => setDeleteDialogOpen(false)}
+                open={clearAllDialogOpen}
+                onClose={() => setClearAllDialogOpen(false)}
                 maxWidth="sm"
                 fullWidth
                 PaperProps={{
@@ -847,14 +1402,14 @@ const Locates = () => {
                                 fontWeight: 600,
                                 lineHeight: 1.2,
                             }}>
-                                Confirm Deletion
+                                Clear All Recycle Bin
                             </Typography>
                             <Typography variant="caption" sx={{
                                 color: GRAY_COLOR,
                                 fontSize: '0.75rem',
                                 fontWeight: 400,
                             }}>
-                                This action cannot be undone
+                                Permanently delete all items from recycle bin
                             </Typography>
                         </Box>
                     </Box>
@@ -869,7 +1424,7 @@ const Locates = () => {
                             mb: 2,
                         }}
                     >
-                        Are you sure you want to delete <strong>{selectedForDeletion.size} item(s)</strong> from the <strong>{deletionSection}</strong> section?
+                        Are you sure you want to permanently delete <strong>{recycleBinItems.length} item(s)</strong> from the recycle bin?
                     </Typography>
                     <Box sx={{
                         p: 1.5,
@@ -891,7 +1446,7 @@ const Locates = () => {
                                     mb: 0.5,
                                 }}
                             >
-                                Warning
+                                Warning: This action cannot be undone
                             </Typography>
                             <Typography
                                 variant="caption"
@@ -901,7 +1456,340 @@ const Locates = () => {
                                     fontWeight: 400,
                                 }}
                             >
-                                All selected work orders will be permanently removed from the system.
+                                All items will be permanently deleted and cannot be recovered. This includes all selected and unselected items in the recycle bin.
+                            </Typography>
+                        </Box>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, pt: 1.5 }}>
+                    <Button
+                        onClick={() => setClearAllDialogOpen(false)}
+                        sx={{
+                            textTransform: 'none',
+                            color: TEXT_COLOR,
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                            px: 2,
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={executeClearAllRecycleBin}
+                        variant="contained"
+                        color="error"
+                        startIcon={<Trash2 size={16} />}
+                        disabled={clearAllRecycleBinMutation.isPending}
+                        sx={{
+                            textTransform: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 500,
+                            px: 2,
+                            bgcolor: RED_COLOR,
+                            boxShadow: 'none',
+                            '&:hover': {
+                                bgcolor: alpha(RED_COLOR, 0.9),
+                                boxShadow: 'none',
+                            },
+                        }}
+                    >
+                        {clearAllRecycleBinMutation.isPending ? 'Clearing...' : 'Clear All Permanently'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Single Restore Confirmation Dialog */}
+            <Dialog
+                open={singleRestoreDialogOpen}
+                onClose={() => setSingleRestoreDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <RotateCcw size={20} color={GREEN_COLOR} />
+                        <Typography variant="h6" sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
+                            Restore Item
+                        </Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                        Are you sure you want to restore work order <strong>{selectedSingleItem?.workOrderNumber}</strong>?
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setSingleRestoreDialogOpen(false)}
+                        variant='outlined'
+                        sx={{
+                            textTransform: 'none',
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="success"
+                        onClick={executeSingleRestore}
+                        disabled={restoreFromRecycleBinMutation.isPending}
+                        startIcon={<RotateCcw size={16} />}
+                        sx={{
+                            textTransform: 'none',
+                        }}
+                    >
+                        {restoreFromRecycleBinMutation.isPending ? 'Restoring...' : 'Restore'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Single Permanent Delete Confirmation Dialog */}
+            <Dialog
+                open={singleDeleteDialogOpen}
+                onClose={() => setSingleDeleteDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Trash2 size={20} color={RED_COLOR} />
+                        <Typography variant="h6" sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
+                            Permanent Delete
+                        </Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                        Are you sure you want to permanently delete work order <strong>{selectedSingleItem?.workOrderNumber}</strong>?
+                        This action cannot be undone.
+                    </Typography>
+                    <Alert severity="warning" icon={<AlertTriangle size={20} />}>
+                        Item will be permanently removed and cannot be recovered.
+                    </Alert>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setSingleDeleteDialogOpen(false)}
+                        variant='outlined'
+                        color='error'
+                        sx={{
+                            textTransform: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={executeSinglePermanentDelete}
+                        disabled={permanentDeleteFromRecycleBinMutation.isPending}
+                        startIcon={<Trash2 size={16} />}
+                        sx={{
+                            textTransform: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                        }}
+                    >
+                        {permanentDeleteFromRecycleBinMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Bulk Restore Confirmation Dialog */}
+            <Dialog
+                open={restoreDialogOpen}
+                onClose={() => setRestoreDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <RotateCcw size={20} color={GREEN_COLOR} />
+                        <Typography variant="h6" sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
+                            Restore Items
+                        </Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                        Are you sure you want to restore {selectedRecycleBinItems.size} item(s) from the recycle bin?
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setRestoreDialogOpen(false)}
+                        variant='outlined'
+                        color='error'
+                        sx={{
+                            textTransform: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="success"
+                        onClick={executeBulkRestore}
+                        disabled={bulkRestoreMutation.isPending}
+                        startIcon={<RotateCcw size={16} />}
+                        sx={{
+                            textTransform: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                        }}
+                    >
+                        {bulkRestoreMutation.isPending ? 'Restoring...' : 'Restore'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Bulk Permanent Delete Confirmation Dialog */}
+            <Dialog
+                open={permanentDeleteDialogOpen}
+                onClose={() => setPermanentDeleteDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Trash2 size={20} color={RED_COLOR} />
+                        <Typography variant="h6" sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
+                            Permanent Delete
+                        </Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                        Are you sure you want to permanently delete {selectedRecycleBinItems.size} item(s) from the recycle bin?
+                        This action cannot be undone.
+                    </Typography>
+                    <Alert severity="warning" icon={<AlertTriangle size={20} />}>
+                        Items will be permanently removed and cannot be recovered.
+                    </Alert>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPermanentDeleteDialogOpen(false)}
+                        sx={{
+                            textTransform: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={executeBulkPermanentDelete}
+                        disabled={bulkPermanentDeleteMutation.isPending}
+                        startIcon={<Trash2 size={16} />}
+                        sx={{
+                            textTransform: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                        }}
+                    >
+                        {bulkPermanentDeleteMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Soft Delete Confirmation Dialog */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={() => setDeleteDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: 'white',
+                        borderRadius: '6px',
+                        border: `1px solid ${alpha(ORANGE_COLOR, 0.1)}`,
+                    }
+                }}
+            >
+                <DialogTitle sx={{
+                    borderBottom: `1px solid ${alpha(ORANGE_COLOR, 0.1)}`,
+                    pb: 1.5,
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: alpha(ORANGE_COLOR, 0.1),
+                            color: ORANGE_COLOR,
+                        }}>
+                            <Trash2 size={18} />
+                        </Box>
+                        <Box>
+                            <Typography variant="h6" sx={{
+                                color: TEXT_COLOR,
+                                fontSize: '0.95rem',
+                                fontWeight: 600,
+                                lineHeight: 1.2,
+                            }}>
+                                Move to Recycle Bin
+                            </Typography>
+                            <Typography variant="caption" sx={{
+                                color: GRAY_COLOR,
+                                fontSize: '0.75rem',
+                                fontWeight: 400,
+                            }}>
+                                Items can be restored from the recycle bin
+                            </Typography>
+                        </Box>
+                    </Box>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2.5, pb: 1.5 }}>
+                    <Typography
+                        variant="body2"
+                        sx={{
+                            color: TEXT_COLOR,
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                            mb: 2,
+                        }}
+                    >
+                        Are you sure you want to move <strong>{selectedForDeletion.size} item(s)</strong> from the <strong>{deletionSection}</strong> section to the recycle bin?
+                    </Typography>
+                    <Box sx={{
+                        p: 1.5,
+                        borderRadius: '6px',
+                        backgroundColor: alpha(ORANGE_COLOR, 0.05),
+                        border: `1px solid ${alpha(ORANGE_COLOR, 0.1)}`,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 1.5,
+                    }}>
+                        <AlertCircle size={18} color={ORANGE_COLOR} />
+                        <Box>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: ORANGE_COLOR,
+                                    fontSize: '0.85rem',
+                                    fontWeight: 500,
+                                    mb: 0.5,
+                                }}
+                            >
+                                Note
+                            </Typography>
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: TEXT_COLOR,
+                                    fontSize: '0.8rem',
+                                    fontWeight: 400,
+                                }}
+                            >
+                                Items moved to the recycle bin can be restored later. Permanent deletion is only available in the recycle bin.
                             </Typography>
                         </Box>
                     </Box>
@@ -920,43 +1808,45 @@ const Locates = () => {
                         Cancel
                     </Button>
                     <Button
-                        onClick={executeBulkDelete}
+                        onClick={executeSoftDelete}
                         variant="contained"
-                        color="error"
+                        color="warning"
                         startIcon={<Trash2 size={16} />}
-                        disabled={deleteBulkMutation.isPending}
+                        disabled={softDeleteBulkMutation.isPending}
                         sx={{
                             textTransform: 'none',
                             fontSize: '0.85rem',
                             fontWeight: 500,
                             px: 2,
+                            bgcolor: ORANGE_COLOR,
                             boxShadow: 'none',
                             '&:hover': {
+                                bgcolor: alpha(ORANGE_COLOR, 0.9),
                                 boxShadow: 'none',
                             },
                         }}
                     >
-                        {deleteBulkMutation.isPending ? 'Deleting...' : 'Delete Selected'}
+                        {softDeleteBulkMutation.isPending ? 'Moving...' : 'Move to Recycle Bin'}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Tag Dialog */}
+            {/* Manual Completion Dialog */}
             <Dialog
-                open={tagDialogOpen}
-                onClose={() => setTagDialogOpen(false)}
+                open={completeDialogOpen}
+                onClose={() => setCompleteDialogOpen(false)}
                 maxWidth="sm"
                 fullWidth
                 PaperProps={{
                     sx: {
                         bgcolor: 'white',
                         borderRadius: '6px',
-                        border: `1px solid ${alpha(BLUE_COLOR, 0.1)}`,
+                        border: `1px solid ${alpha(GREEN_COLOR, 0.1)}`,
                     }
                 }}
             >
                 <DialogTitle sx={{
-                    borderBottom: `1px solid ${alpha(BLUE_COLOR, 0.1)}`,
+                    borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.1)}`,
                     pb: 1.5,
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -967,10 +1857,10 @@ const Locates = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            backgroundColor: alpha(BLUE_COLOR, 0.1),
-                            color: BLUE_COLOR,
+                            backgroundColor: alpha(GREEN_COLOR, 0.1),
+                            color: GREEN_COLOR,
                         }}>
-                            <Tag size={18} />
+                            <CheckCheck size={18} />
                         </Box>
                         <Box>
                             <Typography variant="h6" sx={{
@@ -979,348 +1869,70 @@ const Locates = () => {
                                 fontWeight: 600,
                                 lineHeight: 1.2,
                             }}>
-                                Tag as Locates Needed
+                                Mark as Complete
                             </Typography>
                             <Typography variant="caption" sx={{
                                 color: GRAY_COLOR,
                                 fontSize: '0.75rem',
                                 fontWeight: 400,
                             }}>
-                                Add tags to work order
+                                Complete selected work orders before timer expires
                             </Typography>
                         </Box>
                     </Box>
                 </DialogTitle>
-                <DialogContent>
-                    <Stack spacing={2.5} sx={{ mt: 2 }}>
-                        <Box>
-                            <Typography
-                                variant="subtitle2"
-                                sx={{
-                                    color: TEXT_COLOR,
-                                    fontSize: '0.8rem',
-                                    fontWeight: 600,
-                                    mb: 1,
-                                }}
-                            >
-                                Work Order
-                            </Typography>
-                            <Box sx={{
-                                p: 1.5,
-                                borderRadius: '6px',
-                                backgroundColor: alpha(BLUE_COLOR, 0.05),
-                                border: `1px solid ${alpha(BLUE_COLOR, 0.1)}`,
-                            }}>
-                                <Typography
-                                    variant="body1"
-                                    sx={{
-                                        color: TEXT_COLOR,
-                                        fontSize: '0.9rem',
-                                        fontWeight: 600,
-                                        mb: 0.5,
-                                    }}
-                                >
-                                    {selectedForTagging[0]?.workOrderNumber || 'N/A'}
-                                </Typography>
-                                <Typography
-                                    variant="caption"
-                                    sx={{
-                                        color: GRAY_COLOR,
-                                        fontSize: '0.75rem',
-                                        fontWeight: 400,
-                                    }}
-                                >
-                                    {selectedForTagging[0]?.customerName} • {selectedForTagging[0]?.street}
-                                </Typography>
-                            </Box>
-                        </Box>
-
-                        <StyledTextField
-                            label="Your Name"
-                            value={tagForm.name}
-                            onChange={(e) => setTagForm({ ...tagForm, name: e.target.value })}
-                            fullWidth
-                            required
-                            size="small"
-                            helperText="Auto-filled from your account"
-                            InputProps={{
-                                readOnly: !!userData.name,
-                                sx: { fontSize: '0.85rem' }
-                            }}
-                            sx={{
-                                '& .MuiFormLabel-root': {
-                                    fontSize: '0.85rem',
-                                },
-                                '& .MuiFormHelperText-root': {
-                                    fontSize: '0.75rem',
-                                }
-                            }}
-                        />
-
-                        <StyledTextField
-                            label="Your Email"
-                            value={tagForm.email}
-                            onChange={(e) => setTagForm({ ...tagForm, email: e.target.value })}
-                            fullWidth
-                            required
-                            size="small"
-                            type="email"
-                            helperText="Auto-filled from your account"
-                            InputProps={{
-                                readOnly: !!userData.email,
-                                sx: { fontSize: '0.85rem' }
-                            }}
-                            sx={{
-                                '& .MuiFormLabel-root': {
-                                    fontSize: '0.85rem',
-                                },
-                                '& .MuiFormHelperText-root': {
-                                    fontSize: '0.75rem',
-                                }
-                            }}
-                        />
-
-                        <StyledTextField
-                            label="Tags"
-                            value={tagForm.tags}
-                            onChange={(e) => setTagForm({ ...tagForm, tags: e.target.value })}
-                            fullWidth
-                            size="small"
-                            placeholder="Locates Needed, Additional notes..."
-                            helperText="Separate multiple tags with commas"
-                            InputProps={{
-                                sx: { fontSize: '0.85rem' }
-                            }}
-                            sx={{
-                                '& .MuiFormLabel-root': {
-                                    fontSize: '0.85rem',
-                                },
-                                '& .MuiFormHelperText-root': {
-                                    fontSize: '0.75rem',
-                                }
-                            }}
-                        />
-                    </Stack>
-                </DialogContent>
-                <DialogActions sx={{ p: 2, pt: 1.5 }}>
-                    <OutlineButton
-                        onClick={() => setTagDialogOpen(false)}
+                <DialogContent sx={{ pt: 2.5, pb: 1.5 }}>
+                    <Typography
+                        variant="body2"
                         sx={{
+                            color: TEXT_COLOR,
                             fontSize: '0.85rem',
-                            height: '36px',
-                            px: 2,
+                            fontWeight: 400,
+                            mb: 2,
                         }}
                     >
-                        Cancel
-                    </OutlineButton>
-                    <GradientButton
-                        onClick={handleTagSubmit}
-                        disabled={!tagForm.name.trim() || !tagForm.email.trim() || tagLocatesNeededMutation.isPending}
-                        sx={{
-                            fontSize: '0.85rem',
-                            height: '36px',
-                            px: 2,
-                        }}
-                    >
-                        {tagLocatesNeededMutation.isPending ? 'Tagging...' : 'Tag Work Order'}
-                    </GradientButton>
-                </DialogActions>
-            </Dialog>
-
-            {/* Bulk Tag Dialog */}
-            <Dialog
-                open={bulkTagDialogOpen}
-                onClose={() => setBulkTagDialogOpen(false)}
-                maxWidth="sm"
-                fullWidth
-                PaperProps={{
-                    sx: {
-                        bgcolor: 'white',
+                        Are you sure you want to mark <strong>{selectedForCompletion.size} work order(s)</strong> as complete?
+                        This will move them to the Completed section.
+                    </Typography>
+                    <Box sx={{
+                        p: 1.5,
                         borderRadius: '6px',
-                        border: `1px solid ${alpha(BLUE_COLOR, 0.1)}`,
-                    }
-                }}
-            >
-                <DialogTitle sx={{
-                    borderBottom: `1px solid ${alpha(BLUE_COLOR, 0.1)}`,
-                    pb: 1.5,
-                }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Box sx={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: alpha(BLUE_COLOR, 0.1),
-                            color: BLUE_COLOR,
-                        }}>
-                            <Tag size={18} />
-                        </Box>
-                        <Box>
-                            <Typography variant="h6" sx={{
-                                color: TEXT_COLOR,
-                                fontSize: '0.95rem',
-                                fontWeight: 600,
-                                lineHeight: 1.2,
-                            }}>
-                                Bulk Tag as Locates Needed
-                            </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                                <Chip
-                                    label={`${selectedForTagging.length} items`}
-                                    size="small"
-                                    sx={{
-                                        height: '20px',
-                                        fontSize: '0.7rem',
-                                        fontWeight: 500,
-                                        backgroundColor: alpha(BLUE_COLOR, 0.1),
-                                        color: BLUE_COLOR,
-                                    }}
-                                />
-                                <Typography variant="caption" sx={{
-                                    color: GRAY_COLOR,
-                                    fontSize: '0.75rem',
-                                    fontWeight: 400,
-                                }}>
-                                    Multiple work orders selected
-                                </Typography>
-                            </Box>
-                        </Box>
-                    </Box>
-                </DialogTitle>
-                <DialogContent>
-                    <Stack spacing={2.5} sx={{ mt: 2 }}>
+                        backgroundColor: alpha(GREEN_COLOR, 0.05),
+                        border: `1px solid ${alpha(GREEN_COLOR, 0.1)}`,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 1.5,
+                    }}>
+                        <AlertCircle size={18} color={GREEN_COLOR} />
                         <Box>
                             <Typography
-                                variant="subtitle2"
+                                variant="body2"
+                                sx={{
+                                    color: GREEN_COLOR,
+                                    fontSize: '0.85rem',
+                                    fontWeight: 500,
+                                    mb: 0.5,
+                                }}
+                            >
+                                Note
+                            </Typography>
+                            <Typography
+                                variant="caption"
                                 sx={{
                                     color: TEXT_COLOR,
                                     fontSize: '0.8rem',
-                                    fontWeight: 600,
-                                    mb: 1,
+                                    fontWeight: 400,
                                 }}
                             >
-                                Selected Work Orders
+                                This action will override the timer and mark work orders as completed immediately.
+                                Completed work orders will be moved to the Completed section.
                             </Typography>
-                            <Box sx={{
-                                maxHeight: 120,
-                                overflow: 'auto',
-                                border: `1px solid ${alpha(TEXT_COLOR, 0.1)}`,
-                                p: 1.5,
-                                borderRadius: '6px',
-                                bgcolor: alpha(BLUE_COLOR, 0.02),
-                            }}>
-                                {selectedForTagging.map((item, index) => (
-                                    <Box
-                                        key={index}
-                                        sx={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1,
-                                            py: 0.75,
-                                            borderBottom: index < selectedForTagging.length - 1 ? `1px solid ${alpha(TEXT_COLOR, 0.05)}` : 'none',
-                                        }}
-                                    >
-                                        <ChevronRight size={14} color={GRAY_COLOR} />
-                                        <Box sx={{ flex: 1 }}>
-                                            <Typography
-                                                variant="body2"
-                                                sx={{
-                                                    color: TEXT_COLOR,
-                                                    fontSize: '0.8rem',
-                                                    fontWeight: 500,
-                                                }}
-                                            >
-                                                {item.workOrderNumber}
-                                            </Typography>
-                                            <Typography
-                                                variant="caption"
-                                                sx={{
-                                                    color: GRAY_COLOR,
-                                                    fontSize: '0.7rem',
-                                                    fontWeight: 400,
-                                                }}
-                                            >
-                                                {item.customerName}
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-                                ))}
-                            </Box>
                         </Box>
-
-                        <StyledTextField
-                            label="Your Name"
-                            value={tagForm.name}
-                            onChange={(e) => setTagForm({ ...tagForm, name: e.target.value })}
-                            fullWidth
-                            required
-                            size="small"
-                            helperText="Auto-filled from your account"
-                            InputProps={{
-                                readOnly: !!userData.name,
-                                sx: { fontSize: '0.85rem' }
-                            }}
-                            sx={{
-                                '& .MuiFormLabel-root': {
-                                    fontSize: '0.85rem',
-                                },
-                                '& .MuiFormHelperText-root': {
-                                    fontSize: '0.75rem',
-                                }
-                            }}
-                        />
-
-                        <StyledTextField
-                            label="Your Email"
-                            value={tagForm.email}
-                            onChange={(e) => setTagForm({ ...tagForm, email: e.target.value })}
-                            fullWidth
-                            required
-                            size="small"
-                            type="email"
-                            helperText="Auto-filled from your account"
-                            InputProps={{
-                                readOnly: !!userData.email,
-                                sx: { fontSize: '0.85rem' }
-                            }}
-                            sx={{
-                                '& .MuiFormLabel-root': {
-                                    fontSize: '0.85rem',
-                                },
-                                '& .MuiFormHelperText-root': {
-                                    fontSize: '0.75rem',
-                                }
-                            }}
-                        />
-
-                        <StyledTextField
-                            label="Tags"
-                            value={tagForm.tags}
-                            onChange={(e) => setTagForm({ ...tagForm, tags: e.target.value })}
-                            fullWidth
-                            size="small"
-                            placeholder="Locates Needed, Additional notes..."
-                            helperText="Separate multiple tags with commas"
-                            InputProps={{
-                                sx: { fontSize: '0.85rem' }
-                            }}
-                            sx={{
-                                '& .MuiFormLabel-root': {
-                                    fontSize: '0.85rem',
-                                },
-                                '& .MuiFormHelperText-root': {
-                                    fontSize: '0.75rem',
-                                }
-                            }}
-                        />
-                    </Stack>
+                    </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 2, pt: 1.5 }}>
                     <Button
-                        onClick={() => setBulkTagDialogOpen(false)}
+                        onClick={() => setCompleteDialogOpen(false)}
                         sx={{
                             textTransform: 'none',
                             color: TEXT_COLOR,
@@ -1331,22 +1943,30 @@ const Locates = () => {
                     >
                         Cancel
                     </Button>
-                    <GradientButton
-                        onClick={handleTagSubmit}
-                        disabled={!tagForm.name.trim() || !tagForm.email.trim() || bulkTagLocatesNeededMutation.isPending}
-                        startIcon={<Tag size={16} />}
+                    <Button
+                        onClick={executeBulkComplete}
+                        variant="contained"
+                        color="success"
+                        startIcon={<CheckCheck size={16} />}
+                        disabled={bulkCompleteWorkOrdersMutation.isPending}
                         sx={{
+                            textTransform: 'none',
                             fontSize: '0.85rem',
-                            height: '36px',
+                            fontWeight: 500,
                             px: 2,
+                            bgcolor: GREEN_COLOR,
+                            boxShadow: 'none',
+                            '&:hover': {
+                                bgcolor: alpha(GREEN_COLOR, 0.9),
+                                boxShadow: 'none',
+                            },
                         }}
                     >
-                        {bulkTagLocatesNeededMutation.isPending ? 'Tagging...' : `Tag ${selectedForTagging.length} Items`}
-                    </GradientButton>
+                        {bulkCompleteWorkOrdersMutation.isPending ? 'Completing...' : 'Mark as Complete'}
+                    </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Snackbar (MUI Alert) */}
             <Snackbar
                 open={snackbar.open}
                 autoHideDuration={3000}
@@ -1367,10 +1987,12 @@ const Locates = () => {
                         borderRadius: '6px',
                         backgroundColor: snackbar.severity === 'success'
                             ? alpha(GREEN_COLOR, 0.05)
-                            : alpha(RED_COLOR, 0.05),
-                        borderLeft: `4px solid ${snackbar.severity === 'success' ? GREEN_COLOR : RED_COLOR}`,
+                            : snackbar.severity === 'error'
+                                ? alpha(RED_COLOR, 0.05)
+                                : alpha(ORANGE_COLOR, 0.05),
+                        borderLeft: `4px solid ${snackbar.severity === 'success' ? GREEN_COLOR : snackbar.severity === 'error' ? RED_COLOR : ORANGE_COLOR}`,
                         '& .MuiAlert-icon': {
-                            color: snackbar.severity === 'success' ? GREEN_COLOR : RED_COLOR,
+                            color: snackbar.severity === 'success' ? GREEN_COLOR : snackbar.severity === 'error' ? RED_COLOR : ORANGE_COLOR,
                         },
                         '& .MuiAlert-message': {
                             py: 0.5,
@@ -1393,7 +2015,6 @@ const Locates = () => {
     );
 };
 
-// ── Section Component ──
 const Section = ({
     title,
     color,
@@ -1491,20 +2112,18 @@ const Section = ({
     </Paper>
 );
 
-// ── LocateTable Component ──
 const LocateTable = ({
     items,
     selected,
     onToggleSelect,
     onToggleAll,
     onMarkCalled,
-    onTag,
+    onManualComplete,
     color,
     showCallAction = false,
-    showTagAction = false,
     showCalledBy = false,
-    showTaggedBy = false,
     showTimerColumn = false,
+    showManualCompleteAction = false,
     currentTime,
     totalCount,
     page,
@@ -1558,19 +2177,6 @@ const LocateTable = ({
                                 }}
                             >
                                 Call Action
-                            </TableCell>
-                        )}
-                        {showTagAction && (
-                            <TableCell
-                                width={100}
-                                sx={{
-                                    color: TEXT_COLOR,
-                                    fontSize: '0.8rem',
-                                    fontWeight: 600,
-                                    py: 1.5,
-                                }}
-                            >
-                                Tag
                             </TableCell>
                         )}
                         {showTimerColumn && (
@@ -1631,33 +2237,17 @@ const LocateTable = ({
                                 Called By
                             </TableCell>
                         )}
-                        {showTaggedBy && (
-                            <TableCell
-                                width={200}
-                                sx={{
-                                    color: TEXT_COLOR,
-                                    fontSize: '0.8rem',
-                                    fontWeight: 600,
-                                    py: 1.5,
-                                    pr: 2.5,
-                                }}
-                            >
-                                Tagged By
-                            </TableCell>
-                        )}
                     </TableRow>
                 </TableHead>
                 <TableBody>
                     {items.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={
-                                1 + // Select
+                                1 +
                                 (showCallAction ? 1 : 0) +
-                                (showTagAction ? 1 : 0) +
                                 (showTimerColumn ? 1 : 0) +
-                                4 + // Customer, Address, Date, Technician
-                                (showCalledBy ? 1 : 0) +
-                                (showTaggedBy ? 1 : 0)
+                                4 +
+                                (showCalledBy ? 1 : 0)
                             } align="center" sx={{ py: 6 }}>
                                 <Box sx={{
                                     display: 'flex',
@@ -1770,44 +2360,6 @@ const LocateTable = ({
                                                         Emergency
                                                     </Button>
                                                 </Stack>
-                                            )}
-                                        </TableCell>
-                                    )}
-
-                                    {showTagAction && (
-                                        <TableCell sx={{ py: 1.5 }}>
-                                            {!item.manuallyTagged ? (
-                                                <Tooltip title="Tag as Locates Needed">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => onTag(item)}
-                                                        sx={{
-                                                            color: TEXT_COLOR,
-                                                            padding: '4px',
-                                                            '&:hover': {
-                                                                backgroundColor: alpha(color, 0.1),
-                                                                color: color,
-                                                            }
-                                                        }}
-                                                    >
-                                                        <Tag size={16} />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            ) : (
-                                                <Tooltip title={item.tags}>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                        <Tag size={14} color={GREEN_COLOR} />
-                                                        <Typography
-                                                            sx={{
-                                                                fontSize: '0.8rem',
-                                                                color: TEXT_COLOR,
-                                                                fontWeight: 400,
-                                                            }}
-                                                        >
-                                                            {item.tags.split(',')[0]}
-                                                        </Typography>
-                                                    </Box>
-                                                </Tooltip>
                                             )}
                                         </TableCell>
                                     )}
@@ -2034,54 +2586,6 @@ const LocateTable = ({
                                             )}
                                         </TableCell>
                                     )}
-
-                                    {showTaggedBy && (
-                                        <TableCell sx={{ py: 1.5, pr: 2.5 }}>
-                                            {item.taggedByName ? (
-                                                <Box>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                        <User size={14} color={TEXT_COLOR} />
-                                                        <Typography
-                                                            variant="body2"
-                                                            sx={{
-                                                                color: TEXT_COLOR,
-                                                                fontSize: '0.85rem',
-                                                                fontWeight: 500,
-                                                            }}
-                                                        >
-                                                            {item.taggedByName}
-                                                        </Typography>
-                                                    </Box>
-                                                    {item.taggedByEmail && (
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                                                            <Mail size={12} color={GRAY_COLOR} />
-                                                            <Typography
-                                                                variant="caption"
-                                                                sx={{
-                                                                    color: GRAY_COLOR,
-                                                                    fontSize: '0.75rem',
-                                                                    fontWeight: 400,
-                                                                }}
-                                                            >
-                                                                {item.taggedByEmail}
-                                                            </Typography>
-                                                        </Box>
-                                                    )}
-                                                </Box>
-                                            ) : (
-                                                <Typography
-                                                    variant="body2"
-                                                    sx={{
-                                                        color: GRAY_COLOR,
-                                                        fontSize: '0.85rem',
-                                                        fontWeight: 400,
-                                                    }}
-                                                >
-                                                    —
-                                                </Typography>
-                                            )}
-                                        </TableCell>
-                                    )}
                                 </TableRow>
                             );
                         })
@@ -2089,7 +2593,6 @@ const LocateTable = ({
                 </TableBody>
             </Table>
 
-            {/* Pagination */}
             {totalCount > 0 && (
                 <TablePagination
                     rowsPerPageOptions={[5, 10, 25, 50]}

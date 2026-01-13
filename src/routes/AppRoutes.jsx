@@ -24,8 +24,6 @@ import RMEReports from '../pages/manager/HMIS/RMEReports';
 import RSSReports from '../pages/manager/HMIS/RSSReports';
 import TOSReports from '../pages/manager/HMIS/TOSReports';
 
-
-
 export const AppRoutes = () => {
   const { user } = useAuth();
 
@@ -64,7 +62,14 @@ export const AppRoutes = () => {
         >
           <Route index element={<SuperAdminDashboard />} />
           <Route path="users" element={<UserManagement />} />
+          <Route path="all-technicians" element={<TechUserManagement />} />
           <Route path="profile" element={<SuperAdminProfile />} />
+          {/* Health Department Reports */}
+          <Route path="health-department-report-tracking/rme" element={<RMEReports />} />
+          <Route path="health-department-report-tracking/rss" element={<RSSReports />} />
+          <Route path="health-department-report-tracking/tos" element={<TOSReports />} />
+          {/* Locates - accessible to superadmin */}
+          <Route path="locates" element={<Locates />} />
         </Route>
 
         {/* Manager Routes */}

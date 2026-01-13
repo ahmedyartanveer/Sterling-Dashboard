@@ -1,21 +1,24 @@
 import React from 'react';
 import {
-    Dashboard as DashboardIcon,
-    Assignment as AssignmentIcon,
-    Schedule as ScheduleIcon,
-    Build as TechBoxIcon,
-    AddCircle as AddIcon,
-    History as HistoryIcon,
-    Description as FormIcon,
-    HealthAndSafety as HealthIcon,
-    Security as RiskIcon,
-    MenuBook as CourseIcon,
-    AccountCircle as AccountIcon,
-    PlayCircle as StartIcon,
-    TrendingUp as ProgressIcon,
-    Edit as EditIcon,
-    CheckCircle as SubmitIcon
-} from '@mui/icons-material';
+    LayoutDashboard,
+    ClipboardList,
+    Calendar,
+    Briefcase,
+    PlusCircle,
+    History,
+    FileText,
+    Shield,
+    BookOpen,
+    User,
+    CheckCircle,
+    TrendingUp,
+    // Additional icons
+    AlertTriangle,
+    FileCheck,
+    Activity,
+    Book,
+    ChevronRight,
+} from 'lucide-react';
 
 export const TechMenuComponent = ({ onMenuItemClick }) => {
     const menuItems = [
@@ -25,40 +28,18 @@ export const TechMenuComponent = ({ onMenuItemClick }) => {
             items: [
                 {
                     text: 'Dashboard',
-                    icon: <DashboardIcon />,
+                    icon: <LayoutDashboard size={18} />,
                     path: '/tech-dashboard'
                 },
                 {
                     text: 'My Tasks',
-                    icon: <AssignmentIcon />,
+                    icon: <ClipboardList size={18} />,
                     path: '/tech-dashboard/my-tasks'
                 },
                 {
                     text: 'My Schedule',
-                    icon: <ScheduleIcon />,
+                    icon: <Calendar size={18} />,
                     path: '/tech-dashboard/my-schedule'
-                },
-            ]
-        },
-
-        // Tech Box Section
-        {
-            sectionName: 'Tech Box',
-            items: [
-                {
-                    text: 'Tech Box',
-                    icon: <TechBoxIcon />,
-                    path: '/tech-dashboard/tech-box'
-                },
-                {
-                    text: 'Add to Tech Box',
-                    icon: <AddIcon />,
-                    path: '/tech-dashboard/tech-box/add'
-                },
-                {
-                    text: 'Tech Box History',
-                    icon: <HistoryIcon />,
-                    path: '/tech-dashboard/tech-box/history'
                 },
             ]
         },
@@ -69,22 +50,22 @@ export const TechMenuComponent = ({ onMenuItemClick }) => {
             items: [
                 {
                     text: 'Forms',
-                    icon: <FormIcon />,
+                    icon: <FileText size={18} />,
                     path: '/tech-dashboard/forms'
                 },
                 {
                     text: 'Submit Form',
-                    icon: <SubmitIcon />,
+                    icon: <CheckCircle size={18} />,
                     path: '/tech-dashboard/forms/submit'
                 },
                 {
                     text: 'Health Department Reports',
-                    icon: <HealthIcon />,
+                    icon: <Shield size={18} />,
                     path: '/tech-dashboard/health-department-reports'
                 },
                 {
                     text: 'Submit Health Report',
-                    icon: <HealthIcon />,
+                    icon: <FileCheck size={18} />,
                     path: '/tech-dashboard/health-department-reports/submit'
                 },
             ]
@@ -96,12 +77,12 @@ export const TechMenuComponent = ({ onMenuItemClick }) => {
             items: [
                 {
                     text: 'Risk Management',
-                    icon: <RiskIcon />,
+                    icon: <AlertTriangle size={18} />,
                     path: '/tech-dashboard/risk-management'
                 },
                 {
                     text: 'Submit Risk Assessment',
-                    icon: <SubmitIcon />,
+                    icon: <CheckCircle size={18} />,
                     path: '/tech-dashboard/risk-management/submit'
                 },
             ]
@@ -113,26 +94,9 @@ export const TechMenuComponent = ({ onMenuItemClick }) => {
             items: [
                 {
                     text: 'Courses',
-                    icon: <CourseIcon />,
+                    icon: <BookOpen size={18} />,
                     path: '/tech-dashboard/courses'
-                },
-                {
-                    text: 'Course Progress',
-                    icon: <ProgressIcon />,
-                    path: '/tech-dashboard/courses/progress'
-                },
-            ]
-        },
-
-        // Profile Section
-        {
-            sectionName: 'Profile',
-            items: [
-                {
-                    text: 'My Profile',
-                    icon: <AccountIcon />,
-                    path: '/tech-dashboard/profile'
-                },
+                }
             ]
         },
     ];

@@ -6,18 +6,33 @@ import {
     BarChart3,
     Briefcase,
     Truck,
-    Map,
-    MapPin,
     ListChecks,
     FileText,
-    Car,
     GraduationCap,
     LibraryBig,
     ChevronDown,
     ChevronUp,
     Database,
     SignalHigh,
+    Wrench,
+    Package,
+    Activity,
+    ClipboardCheck,
+    Search,
+    Map as MapIcon,
+    Settings,
+    Calendar,
+    Quote,
+    Target,
+    FileBarChart as FileBarChartIcon,
+    Shield,
+    Award,
+    FileEdit,
+    CheckSquare,
+    MapPin as MapPinIcon,
+    Clipboard,
 } from 'lucide-react';
+import { TollOutlined } from '@mui/icons-material';
 
 export const ManagerMenuComponent = ({ onMenuItemClick }) => {
     const [expandedSections, setExpandedSections] = useState({
@@ -29,6 +44,11 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
         'workorders-subsection': false,
         'assets-subsection': false,
         'reports-subsection': false,
+        'forms-subsection': false,
+        'training-subsection': false,
+        'tasks-subsection': false,
+        'library-subsection': false,
+        'lookup-subsection': false,
     });
 
     const toggleSection = (sectionId) => {
@@ -41,7 +61,7 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
     const menuItems = [
         // 🧭 GENERAL
         {
-            sectionName: 'General',
+            sectionName: 'GENERAL',
             sectionId: 'general-section',
             isExpandable: true,
             items: [
@@ -68,12 +88,12 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                         },
                         {
                             text: 'Logistics Map',
-                            icon: <Map size={16} />,
+                            icon: <MapIcon size={16} />,
                             path: '/manager-dashboard/logistics-map',
                         },
                         {
                             text: 'Locates',
-                            icon: <MapPin size={16} />,
+                            icon: <MapPinIcon size={16} />,
                             path: '/manager-dashboard/locates',
                         },
                     ],
@@ -83,33 +103,75 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                     icon: <ListChecks size={18} />,
                     isExpandable: true,
                     sectionId: 'workorders-subsection',
-                    subItems: [], // ✅ empty sub items
+                    subItems: [
+                        {
+                            text: 'Installations',
+                            icon: <Settings size={16} />,
+                            path: '/manager-dashboard/installations',
+                        },
+                        {
+                            text: 'Repairs',
+                            icon: <Wrench size={16} />,
+                            path: '/manager-dashboard/repairs',
+                        },
+                    ],
                 },
             ],
         },
 
         // 🛠️ MANAGEMENT
         {
-            sectionName: 'Management',
+            sectionName: 'MANAGEMENT',
             sectionId: 'management-section',
             isExpandable: true,
             items: [
                 {
                     text: 'Technicians',
                     icon: <Users size={18} />,
-                    path: '/manager-dashboard/technicians',
+                    isExpandable: true,
+                    sectionId: 'technicians-subsection',
+                    subItems: [
+                        {
+                            text: 'All Technicians',
+                            icon: <Users size={16} />,
+                            path: '/manager-dashboard/all-technicians',
+                        },
+                        {
+                            text: 'Scheduling',
+                            icon: <Calendar size={16} />,
+                            path: '/manager-dashboard/scheduling',
+                        },
+                        {
+                            text: 'Performance',
+                            icon: <Activity size={16} />,
+                            path: '/manager-dashboard/performance',
+                        },
+                    ],
                 },
                 {
                     text: 'Sales',
                     icon: <ClipboardList size={18} />,
-                    path: '/manager-dashboard/sales',
+                    isExpandable: true,
+                    sectionId: 'sales-subsection',
+                    subItems: [
+                        {
+                            text: 'Quotes',
+                            icon: <Quote size={16} />,
+                            path: '/manager-dashboard/quotes',
+                        },
+                        {
+                            text: 'Leads',
+                            icon: <Target size={16} />,
+                            path: '/manager-dashboard/leads',
+                        },
+                    ],
                 },
             ],
         },
 
         // ⚙️ SYSTEM
         {
-            sectionName: 'System',
+            sectionName: 'SYSTEM',
             sectionId: 'system-section',
             isExpandable: true,
             items: [
@@ -118,26 +180,71 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                     icon: <Database size={18} />,
                     isExpandable: true,
                     sectionId: 'assets-subsection',
-                    subItems: [], // ✅ empty sub items
+                    subItems: [
+                        {
+                            text: 'Vehicles & Tools',
+                            icon: <TollOutlined size={16} />,
+                            path: '/manager-dashboard/vehicles-tools',
+                        },
+                        {
+                            text: 'Inventory',
+                            icon: <Package size={16} />,
+                            path: '/manager-dashboard/inventory',
+                        },
+                    ],
                 },
                 {
                     text: 'Reports',
-                    icon: <SignalHigh size={18} />, 
+                    icon: <SignalHigh size={18} />,
                     isExpandable: true,
                     sectionId: 'reports-subsection',
-                    subItems: [], // ✅ empty sub items
+                    subItems: [
+                        {
+                            text: 'Health Dept Reports',
+                            icon: <FileBarChartIcon size={16} />,
+                            path: '/manager-dashboard/health-dept-reports',
+                        },
+                        {
+                            text: 'Risk Management',
+                            icon: <Shield size={16} />,
+                            path: '/manager-dashboard/risk-management',
+                        },
+                        {
+                            text: 'Scorecards',
+                            icon: <Award size={16} />,
+                            path: '/manager-dashboard/scorecards',
+                        },
+                    ],
                 },
                 {
                     text: 'Forms',
                     icon: <FileText size={18} />,
-                    path: '/manager-dashboard/forms',
+                    isExpandable: true,
+                    sectionId: 'forms-subsection',
+                    subItems: [
+                        {
+                            text: 'Forms',
+                            icon: <FileEdit size={16} />,
+                            path: '/manager-dashboard/forms',
+                        },
+                        {
+                            text: 'Review Forms',
+                            icon: <ClipboardCheck size={16} />,
+                            path: '/manager-dashboard/review-forms',
+                        },
+                        {
+                            text: 'Approvals',
+                            icon: <CheckSquare size={16} />,
+                            path: '/manager-dashboard/approvals',
+                        },
+                    ],
                 },
             ],
         },
 
         // 📚 RESOURCES
         {
-            sectionName: 'Resources',
+            sectionName: 'RESOURCES',
             sectionId: 'resources-section',
             isExpandable: true,
             items: [
@@ -148,13 +255,18 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                 },
                 {
                     text: 'Tasks',
-                    icon: <ClipboardList size={18} />,
+                    icon: <Clipboard size={18} />,
                     path: '/manager-dashboard/tasks',
                 },
                 {
                     text: 'Library',
                     icon: <LibraryBig size={18} />,
                     path: '/manager-dashboard/library',
+                },
+                {
+                    text: 'Lookup',
+                    icon: <Search size={18} />,
+                    path: '/manager-dashboard/lookup',
                 },
             ],
         },
@@ -171,10 +283,10 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                     expandIcon: expandedSections[item.sectionId]
                         ? <ChevronUp size={16} />
                         : <ChevronDown size={16} />,
-                    subItems: item.subItems.map(subItem => ({
+                    subItems: item.subItems?.map(subItem => ({
                         ...subItem,
                         onClick: () => onMenuItemClick(subItem.path),
-                    })),
+                    })) || [],
                 };
             }
 
