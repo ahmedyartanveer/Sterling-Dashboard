@@ -145,12 +145,12 @@ const Locates = () => {
     const queryClient = useQueryClient();
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    const [selectedExcavator, setSelectedExcavator] = useState(new Set());
+    const [selectedPending, setSelectedPending] = useState(new Set());
     const [selectedInProgress, setSelectedInProgress] = useState(new Set());
     const [selectedCompleted, setSelectedCompleted] = useState(new Set());
 
-    const [pageExcavator, setPageExcavator] = useState(0);
-    const [rowsPerPageExcavator, setRowsPerPageExcavator] = useState(10);
+    const [pagePending, setPagePending] = useState(0);
+    const [rowsPerPagePending, setRowsPerPagePending] = useState(10);
     const [pageInProgress, setPageInProgress] = useState(0);
     const [rowsPerPageInProgress, setRowsPerPageInProgress] = useState(10);
     const [pageCompleted, setPageCompleted] = useState(0);
@@ -192,22 +192,24 @@ const Locates = () => {
         return () => clearInterval(timer);
     }, []);
 
-    // Optimized query with polling for real-time updates
+    // Updated query with correct API endpoint
     const { data: rawData = [], isLoading, refetch } = useQuery({
         queryKey: ['locates-all'],
         queryFn: async () => {
-            const res = await axiosInstance.get('/all-locates');
+            const res = await axiosInstance.get('/all-locates/');
             return Array.isArray(res.data) ? res.data : res.data?.data || [];
         },
         staleTime: 30000, // 30 seconds
         refetchInterval: 60000, // Refetch every minute for real-time updates
     });
 
-    // Optimized recycle bin query with polling
+    console.log('Fetched locates data:', rawData);
+
+    // Optimized recycle bin query with polling - updated endpoint
     const { data: deletedHistoryData = {}, isLoading: isRecycleBinLoading, refetch: refetchRecycleBin } = useQuery({
         queryKey: ['locates-deleted-history'],
         queryFn: async () => {
-            const res = await axiosInstance.get('/deleted-history');
+            const res = await axiosInstance.get('/deleted-history/');
             return res.data || {};
         },
         staleTime: 30000,
@@ -218,6 +220,9 @@ const Locates = () => {
     useEffect(() => {
         if (deletedHistoryData.data) {
             const filtered = deletedHistoryData.data.filter(item => !item.isPermanentlyDeleted);
+            setRecycleBinCount(filtered.length);
+        } else if (deletedHistoryData.deleted_work_orders) {
+            const filtered = deletedHistoryData.deleted_work_orders.filter(item => !item.is_permanently_deleted);
             setRecycleBinCount(filtered.length);
         }
     }, [deletedHistoryData]);
@@ -230,16 +235,16 @@ const Locates = () => {
     const markCalledMutation = useMutation({
         mutationFn: async ({ id, callType }) => {
             const response = await axiosInstance.patch(
-                `/work-order/${id}/update-call-status`,
+                `/work-order/${id}/update-call-status/`,
                 {
-                    locatesCalled: true,
-                    callType,
-                    calledAt: new Date().toISOString(),
+                    locates_called: true,
+                    call_type: callType,
+                    called_at: new Date().toISOString(),
                 }
             );
-            return response;
+            return response.data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             invalidateAndRefetch();
             showSnackbar('Locate call status updated', 'success');
         },
@@ -250,10 +255,10 @@ const Locates = () => {
 
     const softDeleteBulkMutation = useMutation({
         mutationFn: (ids) =>
-            axiosInstance.delete('/work-order/bulk-delete', { data: { ids: Array.from(ids) } }),
+            axiosInstance.delete('/work-order/bulk-delete/', { data: { ids: Array.from(ids) } }),
         onSuccess: () => {
             invalidateAndRefetch();
-            setSelectedExcavator(new Set());
+            setSelectedPending(new Set());
             setSelectedInProgress(new Set());
             setSelectedCompleted(new Set());
             if (recycleBinOpen) {
@@ -266,8 +271,8 @@ const Locates = () => {
 
     const completeWorkOrderManuallyMutation = useMutation({
         mutationFn: async (id) => {
-            const response = await axiosInstance.patch(`/work-order/${id}/complete`);
-            return response;
+            const response = await axiosInstance.patch(`/work-order/${id}/complete/`);
+            return response.data;
         },
         onSuccess: () => {
             invalidateAndRefetch();
@@ -283,10 +288,10 @@ const Locates = () => {
     const bulkCompleteWorkOrdersMutation = useMutation({
         mutationFn: async (ids) => {
             const promises = Array.from(ids).map(id =>
-                axiosInstance.patch(`/work-order/${id}/complete`)
+                axiosInstance.patch(`/work-order/${id}/complete/`)
             );
             const responses = await Promise.all(promises);
-            return responses;
+            return responses.map(r => r.data);
         },
         onSuccess: (responses) => {
             invalidateAndRefetch();
@@ -302,9 +307,9 @@ const Locates = () => {
     const restoreFromRecycleBinMutation = useMutation({
         mutationFn: async ({ dashboardId, deletedOrderId }) => {
             const response = await axiosInstance.post(
-                `/history/${dashboardId}/${deletedOrderId}/restore`
+                `/history/${dashboardId}/${deletedOrderId}/restore/`
             );
-            return response;
+            return response.data;
         },
         onSuccess: () => {
             invalidateAndRefetch();
@@ -321,10 +326,10 @@ const Locates = () => {
     const bulkRestoreMutation = useMutation({
         mutationFn: async (items) => {
             const promises = items.map(item =>
-                axiosInstance.post(`/history/${item.dashboardId}/${item.deletedOrderId}/restore`)
+                axiosInstance.post(`/history/${item.dashboardId}/${item.deletedOrderId}/restore/`)
             );
             const responses = await Promise.all(promises);
-            return responses;
+            return responses.map(r => r.data);
         },
         onSuccess: (responses) => {
             invalidateAndRefetch();
@@ -340,9 +345,9 @@ const Locates = () => {
     const permanentDeleteFromRecycleBinMutation = useMutation({
         mutationFn: async ({ dashboardId, deletedOrderId }) => {
             const response = await axiosInstance.delete(
-                `/history/${dashboardId}/${deletedOrderId}/permanent`
+                `/history/${dashboardId}/${deletedOrderId}/permanent/`
             );
-            return response;
+            return response.data;
         },
         onSuccess: () => {
             refetchRecycleBin();
@@ -357,15 +362,15 @@ const Locates = () => {
 
     const bulkPermanentDeleteMutation = useMutation({
         mutationFn: async (items) => {
-            const response = await axiosInstance.delete('/history/bulk-permanent-delete', {
+            const response = await axiosInstance.delete('/history/bulk-permanent-delete/', {
                 data: { items }
             });
-            return response;
+            return response.data;
         },
-        onSuccess: (response) => {
+        onSuccess: (data) => {
             refetchRecycleBin();
             setSelectedRecycleBinItems(new Set());
-            showSnackbar(`${response.data.deletedCount} item(s) permanently deleted`, 'success');
+            showSnackbar(`${data.deletedCount || items.length} item(s) permanently deleted`, 'success');
         },
         onError: (err) => {
             showSnackbar(err?.response?.data?.message || 'Bulk permanent delete failed', 'error');
@@ -374,8 +379,8 @@ const Locates = () => {
 
     const clearAllRecycleBinMutation = useMutation({
         mutationFn: async () => {
-            const response = await axiosInstance.delete('/history/clear-all');
-            return response;
+            const response = await axiosInstance.delete('/history/clear-all/');
+            return response.data;
         },
         onSuccess: () => {
             refetchRecycleBin();
@@ -389,127 +394,151 @@ const Locates = () => {
     });
 
     const processed = useMemo(() => {
-        return rawData
-            .flatMap(item => item.workOrders || [])
-            .map(wo => {
-                const addr = parseDashboardAddress(wo.customerAddress || '');
-                const isEmergency = (wo.type || wo.priorityName || '').toUpperCase().includes('EMERGENCY');
-                const type = isEmergency ? 'EMERGENCY' : 'STANDARD';
+        // Extract all work orders from all dashboards
+        const allWorkOrders = [];
 
-                let completionDate = null;
-                let timeRemainingText = '';
-                let timeRemainingDetail = '';
-                let timeRemainingColor = TEXT_COLOR;
-                let isExpired = false;
+        rawData.forEach(dashboard => {
+            if (dashboard.work_orders && Array.isArray(dashboard.work_orders)) {
+                dashboard.work_orders.forEach(wo => {
+                    const addr = parseDashboardAddress(wo.customer_address || '');
+                    const isEmergency = (wo.type || wo.priority_name || '').toUpperCase().includes('EMERGENCY');
+                    const type = isEmergency ? 'EMERGENCY' : 'STANDARD';
 
-                const calledByName = wo.calledBy || wo.metadata?.updatedBy || '';
-                const calledByEmail = wo.calledByEmail || '';
+                    let completionDate = null;
+                    let timeRemainingText = '';
+                    let timeRemainingDetail = '';
+                    let timeRemainingColor = TEXT_COLOR;
+                    let isExpired = false;
 
-                if (wo.locatesCalled && wo.calledAt && wo.callType) {
-                    const called = new Date(wo.calledAt);
-                    completionDate = wo.completionDate ? new Date(wo.completionDate) :
-                        (wo.callType === 'EMERGENCY' ? addHours(called, 4) : addBusinessDays(called, 2));
+                    const calledByName = wo.called_by || wo.metadata?.updatedBy || '';
+                    const calledByEmail = wo.called_by_email || '';
 
-                    const now = currentTime;
-                    isExpired = isBefore(completionDate, now);
+                    if (wo.locates_called && wo.called_at && wo.call_type) {
+                        const called = new Date(wo.called_at);
+                        completionDate = wo.completion_date ? new Date(wo.completion_date) :
+                            (wo.call_type === 'EMERGENCY' ? addHours(called, 4) : addBusinessDays(called, 2));
 
-                    if (!isExpired) {
-                        if (wo.callType === 'EMERGENCY') {
-                            const totalMs = 4 * 60 * 60 * 1000;
-                            const elapsedMs = now.getTime() - called.getTime();
-                            const remainingMs = Math.max(0, totalMs - elapsedMs);
+                        const now = currentTime;
+                        isExpired = isBefore(completionDate, now);
 
-                            timeRemainingText = formatEmergencyCountdown(remainingMs);
-                            timeRemainingDetail = `Expires at: ${format(completionDate, 'MMM dd, HH:mm:ss')}`;
+                        if (!isExpired) {
+                            if (wo.call_type === 'EMERGENCY') {
+                                const totalMs = 4 * 60 * 60 * 1000;
+                                const elapsedMs = now.getTime() - called.getTime();
+                                const remainingMs = Math.max(0, totalMs - elapsedMs);
 
-                            if (remainingMs <= 30 * 60 * 1000) {
-                                timeRemainingColor = RED_COLOR;
-                            } else if (remainingMs <= 60 * 60 * 1000) {
-                                timeRemainingColor = ORANGE_COLOR;
+                                timeRemainingText = formatEmergencyCountdown(remainingMs);
+                                timeRemainingDetail = `Expires at: ${format(completionDate, 'MMM dd, HH:mm:ss')}`;
+
+                                if (remainingMs <= 30 * 60 * 1000) {
+                                    timeRemainingColor = RED_COLOR;
+                                } else if (remainingMs <= 60 * 60 * 1000) {
+                                    timeRemainingColor = ORANGE_COLOR;
+                                } else {
+                                    timeRemainingColor = BLUE_COLOR;
+                                }
                             } else {
-                                timeRemainingColor = BLUE_COLOR;
+                                const businessInfo = getBusinessDaysRemaining(completionDate);
+                                const now = new Date();
+                                const isBusinessDay = !isWeekend(now);
+
+                                if (businessInfo.days === 0 && isBusinessDay) {
+                                    const businessHoursRemaining = Math.max(0, 17 - now.getHours());
+                                    timeRemainingText = `${businessHoursRemaining}h remaining today`;
+                                } else if (businessInfo.days === 1) {
+                                    timeRemainingText = `1 business day`;
+                                } else {
+                                    timeRemainingText = `${businessInfo.days} business days`;
+                                }
+
+                                timeRemainingDetail = `Expires: ${format(completionDate, 'MMM dd, yyyy')}`;
+
+                                if (businessInfo.days === 0) {
+                                    timeRemainingColor = ORANGE_COLOR;
+                                } else if (businessInfo.days <= 1) {
+                                    timeRemainingColor = ORANGE_COLOR;
+                                } else {
+                                    timeRemainingColor = BLUE_COLOR;
+                                }
                             }
                         } else {
-                            const businessInfo = getBusinessDaysRemaining(completionDate);
-                            const now = new Date();
-                            const isBusinessDay = !isWeekend(now);
-
-                            if (businessInfo.days === 0 && isBusinessDay) {
-                                const businessHoursRemaining = Math.max(0, 17 - now.getHours());
-                                timeRemainingText = `${businessHoursRemaining}h remaining today`;
-                            } else if (businessInfo.days === 1) {
-                                timeRemainingText = `1 business day`;
-                            } else {
-                                timeRemainingText = `${businessInfo.days} business days`;
-                            }
-
-                            timeRemainingDetail = `Expires: ${format(completionDate, 'MMM dd, yyyy')}`;
-
-                            if (businessInfo.days === 0) {
-                                timeRemainingColor = ORANGE_COLOR;
-                            } else if (businessInfo.days <= 1) {
-                                timeRemainingColor = ORANGE_COLOR;
-                            } else {
-                                timeRemainingColor = BLUE_COLOR;
-                            }
+                            timeRemainingText = 'EXPIRED';
+                            timeRemainingDetail = `Expired on: ${format(completionDate, 'MMM dd, yyyy HH:mm')}`;
+                            timeRemainingColor = RED_COLOR;
                         }
-                    } else {
-                        timeRemainingText = 'EXPIRED';
-                        timeRemainingDetail = `Expired on: ${format(completionDate, 'MMM dd, yyyy HH:mm')}`;
-                        timeRemainingColor = RED_COLOR;
                     }
-                }
 
-                return {
-                    id: wo._id || `ext-${wo.workOrderNumber || Math.random().toString(36).slice(2, 9)}`,
-                    jobId: wo.workOrderNumber || 'N/A',
-                    workOrderNumber: wo.workOrderNumber || '',
-                    customerName: wo.customerName || 'Unknown',
-                    ...addr,
-                    type,
-                    techName: wo.techName || wo.technician || 'Unassigned',
-                    requestedDate: wo.createdDate || wo.requestedDate,
-                    completedAt: wo.completedDate,
-                    locatesCalled: !!wo.locatesCalled,
-                    callType: wo.callType || null,
-                    calledByName,
-                    calledByEmail,
-                    calledAt: wo.calledAt,
-                    completionDate: completionDate,
-                    priorityName: wo.priorityName || 'Standard',
-                    priorityColor: wo.priorityColor,
-                    needsCall: (wo.priorityName || '').toUpperCase() === 'EXCAVATOR',
-                    isExpired,
-                    timeRemainingText,
-                    timeRemainingDetail,
-                    timeRemainingColor,
-                    workflowStatus: wo.workflowStatus || 'UNKNOWN',
-                };
-            });
+                    allWorkOrders.push({
+                        id: wo.id || `ext-${wo.work_order_number || Math.random().toString(36).slice(2, 9)}`,
+                        workOrderId: wo.id,
+                        jobId: wo.work_order_number || 'N/A',
+                        workOrderNumber: wo.work_order_number || '',
+                        customerName: wo.customer_name || 'Unknown',
+                        ...addr,
+                        type,
+                        techName: wo.tech_name || wo.technician || 'Unassigned',
+                        requestedDate: wo.created_date || wo.requested_date,
+                        completedAt: wo.completed_date,
+                        locatesCalled: !!wo.locates_called,
+                        callType: wo.call_type || null,
+                        calledByName,
+                        calledByEmail,
+                        calledAt: wo.called_at,
+                        completionDate: completionDate,
+                        priorityName: wo.priority_name || 'Standard',
+                        priorityColor: wo.priority_color,
+                        needsCall: (wo.priority_name || '').toUpperCase() === 'EXCAVATOR',
+                        isExpired,
+                        timeRemainingText,
+                        timeRemainingDetail,
+                        timeRemainingColor,
+                        workflowStatus: wo.workflow_status || 'UNKNOWN',
+                        dashboardId: dashboard.id || null,
+                    });
+                });
+            }
+        });
+
+        return allWorkOrders;
     }, [rawData, currentTime]);
 
     const recycleBinItems = useMemo(() => {
-        const data = deletedHistoryData.data || [];
+        const data = deletedHistoryData.data || deletedHistoryData.deleted_work_orders || [];
         const extractedData = data.map(item => {
-            const actualData = item._doc ? item._doc : item;
-            const dashboardId = item.dashboardId || actualData.dashboardId ||
-                (item.$__parent ? item.$__parent._id : null);
-            const dashboardName = item.dashboardName || actualData.dashboardName ||
-                (item.$__parent ? `Dashboard ${item.$__parent._id}` : 'Unknown Dashboard');
+            // Extract dashboard ID from the data
+            const dashboardId = item.dashboard_id || item.dashboardId ||
+                (item.original_dashboard ? item.original_dashboard : null) ||
+                (deletedHistoryData.id ? deletedHistoryData.id.toString() : null);
+
+            const dashboardName = item.dashboard_name || item.dashboardName ||
+                `Dashboard ${dashboardId || 'Unknown'}`;
+
+            // Handle both field name formats
+            const deletedOrderId = item.id || item.original_work_order_id;
+            const workOrderNumber = item.work_order_number || 'N/A';
+            const customerName = item.customer_name || 'Unknown';
+            const customerAddress = item.customer_address || '';
+            const deletedBy = item.deleted_by || item.deletedBy || 'Unknown';
+            const deletedByEmail = item.deleted_by_email || item.deletedByEmail || '';
+            const deletedAt = item.deleted_at || item.deletedAt;
+            const deletedFrom = item.deleted_from || item.deletedFrom || 'Unknown';
+            const isPermanentlyDeleted = item.is_permanently_deleted || item.isPermanentlyDeleted || false;
+            const originalWorkOrderId = item.original_work_order_id || item.id;
 
             return {
-                ...actualData,
-                dashboardId: dashboardId,
-                dashboardName: dashboardName,
-                deletedOrderId: actualData._id || item._id,
-                workOrderNumber: actualData.workOrderNumber || item.workOrderNumber,
-                customerName: actualData.customerName || item.customerName,
-                customerAddress: actualData.customerAddress || item.customerAddress,
-                deletedBy: actualData.deletedBy || item.deletedBy,
-                deletedByEmail: actualData.deletedByEmail || item.deletedByEmail,
-                deletedAt: actualData.deletedAt || item.deletedAt,
-                deletedFrom: actualData.deletedFrom || item.deletedFrom,
-                isPermanentlyDeleted: actualData.isPermanentlyDeleted || item.isPermanentlyDeleted || false,
+                ...item,
+                dashboardId: dashboardId ? dashboardId.toString() : '1',
+                dashboardName,
+                deletedOrderId: deletedOrderId ? deletedOrderId.toString() : item.id?.toString() || '1',
+                originalWorkOrderId: originalWorkOrderId ? originalWorkOrderId.toString() : '1',
+                workOrderNumber,
+                customerName,
+                customerAddress,
+                deletedBy,
+                deletedByEmail,
+                deletedAt,
+                deletedFrom,
+                isPermanentlyDeleted,
             };
         });
 
@@ -527,10 +556,11 @@ const Locates = () => {
         }
 
         return searchFiltered;
-    }, [deletedHistoryData.data, recycleBinSearch]);
+    }, [deletedHistoryData, recycleBinSearch]);
 
-    const excavatorPending = useMemo(() => {
-        let filtered = processed.filter(l => l.needsCall && !l.locatesCalled);
+    // SHOW ALL DATA WITHOUT FILTERING FOR EXCAVATOR
+    const allPending = useMemo(() => {
+        let filtered = processed.filter(l => !l.locatesCalled);
         if (searchTerm) {
             const searchLower = searchTerm.toLowerCase();
             filtered = filtered.filter(l =>
@@ -550,13 +580,13 @@ const Locates = () => {
     const completed = useMemo(() =>
         processed.filter(l => (l.locatesCalled && l.isExpired) || l.workflowStatus === 'COMPLETE'), [processed]);
 
-    const handleChangePageExcavator = (event, newPage) => {
-        setPageExcavator(newPage);
+    const handleChangePagePending = (event, newPage) => {
+        setPagePending(newPage);
     };
 
-    const handleChangeRowsPerPageExcavator = (event) => {
-        setRowsPerPageExcavator(parseInt(event.target.value, 10));
-        setPageExcavator(0);
+    const handleChangeRowsPerPagePending = (event) => {
+        setRowsPerPagePending(parseInt(event.target.value, 10));
+        setPagePending(0);
     };
 
     const handleChangePageInProgress = (event, newPage) => {
@@ -651,10 +681,10 @@ const Locates = () => {
         if (allSelectedOnPage) {
             const newSet = new Set(currentSelected);
             allPageIds.forEach(id => newSet.delete(id));
-            return newSet;
+            setSelectedRecycleBinItems(newSet);
         } else {
             const newSet = new Set([...currentSelected, ...allPageIds]);
-            return newSet;
+            setSelectedRecycleBinItems(newSet);
         }
     };
 
@@ -732,9 +762,9 @@ const Locates = () => {
         });
     };
 
-    const toggleAllSelection = (setState, items, pageItems) => {
+    const toggleAllSelection = (items, pageItems, selectedSet) => {
         const allPageIds = new Set(pageItems.map(item => item.id));
-        const currentSelected = new Set(setState);
+        const currentSelected = new Set(selectedSet);
         const allSelectedOnPage = Array.from(allPageIds).every(id => currentSelected.has(id));
 
         if (allSelectedOnPage) {
@@ -761,9 +791,9 @@ const Locates = () => {
         );
     }
 
-    const excavatorPageItems = excavatorPending.slice(
-        pageExcavator * rowsPerPageExcavator,
-        pageExcavator * rowsPerPageExcavator + rowsPerPageExcavator
+    const pendingPageItems = allPending.slice(
+        pagePending * rowsPerPagePending,
+        pagePending * rowsPerPagePending + rowsPerPagePending
     );
 
     const inProgressPageItems = inProgress.slice(
@@ -827,12 +857,13 @@ const Locates = () => {
                 </Button>
             </Box>
 
+            {/* UPDATED SECTION - Now shows all pending work orders, not just excavator */}
             <Section
-                title="Call Needed "
+                title="Pending Locates"
                 color={ORANGE_COLOR}
-                count={excavatorPending.length}
-                selectedCount={selectedExcavator.size}
-                onDelete={() => confirmSoftDelete(selectedExcavator, 'Call Needed')}
+                count={allPending.length}
+                selectedCount={selectedPending.size}
+                onDelete={() => confirmSoftDelete(selectedPending, 'Pending Locates')}
                 additionalActions={
                     <Stack direction="row" spacing={1} alignItems="center">
                         <StyledTextField
@@ -871,18 +902,19 @@ const Locates = () => {
                 }
             >
                 <LocateTable
-                    items={excavatorPageItems}
-                    selected={selectedExcavator}
-                    onToggleSelect={(id) => toggleSelection(setSelectedExcavator, id)}
-                    onToggleAll={() => setSelectedExcavator(toggleAllSelection(selectedExcavator, excavatorPending, excavatorPageItems))}
+                    items={pendingPageItems}
+                    selected={selectedPending}
+                    onToggleSelect={(id) => toggleSelection(setSelectedPending, id)}
+                    onToggleAll={() => setSelectedPending(toggleAllSelection(allPending, pendingPageItems, selectedPending))}
                     onMarkCalled={handleMarkCalled}
                     color={ORANGE_COLOR}
                     showCallAction
-                    totalCount={excavatorPending.length}
-                    page={pageExcavator}
-                    rowsPerPage={rowsPerPageExcavator}
-                    onPageChange={handleChangePageExcavator}
-                    onRowsPerPageChange={handleChangeRowsPerPageExcavator}
+                    totalCount={allPending.length}
+                    page={pagePending}
+                    rowsPerPage={rowsPerPagePending}
+                    onPageChange={handleChangePagePending}
+                    onRowsPerPageChange={handleChangeRowsPerPagePending}
+                    markCalledMutation={markCalledMutation}
                 />
             </Section>
 
@@ -924,7 +956,7 @@ const Locates = () => {
                     items={inProgressPageItems}
                     selected={selectedInProgress}
                     onToggleSelect={(id) => toggleSelection(setSelectedInProgress, id)}
-                    onToggleAll={() => setSelectedInProgress(toggleAllSelection(selectedInProgress, inProgress, inProgressPageItems))}
+                    onToggleAll={() => setSelectedInProgress(toggleAllSelection(inProgress, inProgressPageItems, selectedInProgress))}
                     onManualComplete={handleManualCompletion}
                     color={BLUE_COLOR}
                     showTimerColumn
@@ -936,6 +968,7 @@ const Locates = () => {
                     rowsPerPage={rowsPerPageInProgress}
                     onPageChange={handleChangePageInProgress}
                     onRowsPerPageChange={handleChangeRowsPerPageInProgress}
+                    completeWorkOrderManuallyMutation={completeWorkOrderManuallyMutation}
                 />
             </Section>
 
@@ -950,7 +983,7 @@ const Locates = () => {
                     items={completedPageItems}
                     selected={selectedCompleted}
                     onToggleSelect={(id) => toggleSelection(setSelectedCompleted, id)}
-                    onToggleAll={() => setSelectedCompleted(toggleAllSelection(selectedCompleted, completed, completedPageItems))}
+                    onToggleAll={() => setSelectedCompleted(toggleAllSelection(completed, completedPageItems, selectedCompleted))}
                     color={GREEN_COLOR}
                     showCalledBy
                     showTimerColumn={false}
@@ -1046,6 +1079,23 @@ const Locates = () => {
                         gap: 2,
                     }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Checkbox
+                                size="small"
+                                checked={recycleBinPageItems.length > 0 && recycleBinPageItems.every(item =>
+                                    selectedRecycleBinItems.has(`${item.dashboardId}_${item.deletedOrderId}`)
+                                )}
+                                indeterminate={
+                                    recycleBinPageItems.length > 0 &&
+                                    recycleBinPageItems.some(item =>
+                                        selectedRecycleBinItems.has(`${item.dashboardId}_${item.deletedOrderId}`)
+                                    ) &&
+                                    !recycleBinPageItems.every(item =>
+                                        selectedRecycleBinItems.has(`${item.dashboardId}_${item.deletedOrderId}`)
+                                    )
+                                }
+                                onChange={toggleAllRecycleBinSelection}
+                                sx={{ padding: '4px' }}
+                            />
                             <StyledTextField
                                 size="small"
                                 placeholder="Search deleted items..."
@@ -2130,6 +2180,8 @@ const LocateTable = ({
     rowsPerPage,
     onPageChange,
     onRowsPerPageChange,
+    markCalledMutation,
+    completeWorkOrderManuallyMutation,
 }) => {
     const allSelectedOnPage = items.length > 0 && items.every(item => selected.has(item.id));
     const someSelectedOnPage = items.length > 0 && items.some(item => selected.has(item.id));
@@ -2333,8 +2385,9 @@ const LocateTable = ({
                                                     <Button
                                                         size="small"
                                                         variant="outlined"
-                                                        onClick={() => onMarkCalled(item.id, 'STANDARD')}
+                                                        onClick={() => onMarkCalled(item.workOrderId || item.id, 'STANDARD')}
                                                         startIcon={<PhoneCall size={14} />}
+                                                        disabled={markCalledMutation?.isPending}
                                                         sx={{
                                                             textTransform: 'none',
                                                             fontSize: '0.75rem',
@@ -2342,14 +2395,15 @@ const LocateTable = ({
                                                             px: 1.5,
                                                         }}
                                                     >
-                                                        Standard
+                                                        {markCalledMutation?.isPending && markCalledMutation.variables?.id === (item.workOrderId || item.id) ? 'Calling...' : 'Standard'}
                                                     </Button>
                                                     <Button
                                                         size="small"
                                                         variant="outlined"
                                                         color="error"
-                                                        onClick={() => onMarkCalled(item.id, 'EMERGENCY')}
+                                                        onClick={() => onMarkCalled(item.workOrderId || item.id, 'EMERGENCY')}
                                                         startIcon={<AlertTriangle size={14} />}
+                                                        disabled={markCalledMutation?.isPending}
                                                         sx={{
                                                             textTransform: 'none',
                                                             fontSize: '0.75rem',
@@ -2357,7 +2411,7 @@ const LocateTable = ({
                                                             px: 1.5,
                                                         }}
                                                     >
-                                                        Emergency
+                                                        {markCalledMutation?.isPending && markCalledMutation.variables?.id === (item.workOrderId || item.id) ? 'Calling...' : 'Emergency'}
                                                     </Button>
                                                 </Stack>
                                             )}

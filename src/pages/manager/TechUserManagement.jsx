@@ -520,7 +520,7 @@ export const TechUserManagement = () => {
                                                             fontWeight: 400,
                                                         }}
                                                     >
-                                                        ID: {user._id?.substring(0, 8)}...
+                                                        ID: {user.id}
                                                     </Typography>
                                                 </Box>
                                             </Box>
