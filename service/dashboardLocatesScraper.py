@@ -233,9 +233,13 @@ async def main():
     
 def start_scraping():
     print("Scraping started...")
-    
+
     if sys.platform.startswith("win"):
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        print("OS: Windows detected. Policy set to Proactor.")
+    else:
+        print(f"OS: {sys.platform} detected. Using default event loop.")
         
     try:
         asyncio.run(main())
