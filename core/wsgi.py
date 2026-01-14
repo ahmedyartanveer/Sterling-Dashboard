@@ -11,13 +11,8 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-from . import scheduler
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 
 application = get_wsgi_application()
 
-try:
-    scheduler.start()
-except Exception as e:
-    print(f"Scheduler error: {e}")

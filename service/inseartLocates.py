@@ -14,8 +14,8 @@ class InseartLocatesService:
         }
         
         # URL setup
-        self.base_url = os.getenv('API_URL', 'http://38.54.108.152/api/')
-        self.api_url = self.base_url + "sync-assigned-dashboard"
+        self.base_url = os.getenv('API_URL')
+        self.api_url = self.base_url + "sync-dashboard"
         self.login_url = self.base_url + "auth/login"
         
         # Utilities
@@ -67,7 +67,10 @@ class InseartLocatesService:
         
         # 2. Add Authorization header
         self.headers_data['Authorization'] = f'Bearer {self.token}'
-        
+        print(locates_data)
+        if not locates_data.get("workOrders", []):
+            print("No work orders to insert.")
+            return False
         print("Sending locates data...")
         try:
             response = requests.post(self.api_url, json=locates_data, headers=self.headers_data)
@@ -107,12 +110,27 @@ if __name__ == "__main__":
     
     # Dummy data for testing
     dummy_data = {
-        "assigned_dashboard_id": 1,
-        "locates": [
-            {"lat": 23.8103, "lng": 90.4125, "timestamp": "2026-01-13T10:00:00Z"},
-            {"lat": 23.8105, "lng": 90.4128, "timestamp": "2026-01-13T10:05:00Z"}
+        "filterStartDate": "01/14/2026",
+        "filterEndDate": "01/14/2026",
+        "workOrders": [
+            {
+            "priorityColor": "rgb(128, 96, 77)",
+            "priorityName": "EXCAVATOR",
+            "workOrderNumber": "14523",
+            "customerPO": "",
+            "customerName": "Tracy Hamilton",
+            "customerAddress": "22806 70Th Ave E - Graham Wa 98338",
+            "tags": "",
+            "techName": "02 - Huss",
+            "purchaseStatus": "",
+            "promisedAppointment": "",
+            "createdDate": "01/05/2026 2:20 PM",
+            "scheduledDate": "01/14/2026 8:00 AM - 2:00 PM",
+            "task": "HOME SALE REPAIR(6H)"
+            }
         ]
-    }
+        }
+
     
     # Call the new method
     if service.token:

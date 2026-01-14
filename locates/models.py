@@ -1,103 +1,90 @@
 from django.db import models
+from django.contrib.auth.models import User
 from django.utils import timezone
-from datetime import timedelta
-import json
 
-# ===========================
-# 1. Dashboard Model
-# ===========================
 class DashboardData(models.Model):
     filter_start_date = models.CharField(max_length=50, blank=True, null=True)
     filter_end_date = models.CharField(max_length=50, blank=True, null=True)
     total_work_orders = models.IntegerField(default=0)
-    source = models.CharField(max_length=100, default='external-dashboard')
-    scraped_at = models.DateTimeField(auto_now_add=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    total_deleted_work_orders = models.IntegerField(default=0)
+    scraped_at = models.DateTimeField(default=timezone.now)
+    
+    # Metadata stored as JSON
+    dashboard_metadata = models.JSONField(default=dict)
 
     class Meta:
         ordering = ['-created_at']
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-# ===========================
-# 2. Work Order Model
-# ===========================
-class WorkOrder(models.Model):
-    # Relationship with Dashboard (Nested in Node, FK in Django)
-    dashboard = models.ForeignKey(DashboardData, on_delete=models.CASCADE, related_name='workOrders')
+    def update_counts(self):
+        self.total_work_orders = self.work_orders.count()
+        self.total_deleted_work_orders = self.deleted_work_orders.count()
+        self.save()
 
-    # --- Priority & Identification ---
-    priority_color = models.CharField(max_length=50, default='', blank=True)
-    priority_name = models.CharField(max_length=100, default='', blank=True)
-    work_order_number = models.CharField(max_length=100, default='', blank=True)
-
-    # --- Customer Info ---
-    customer_po = models.CharField(max_length=100, default='', blank=True)
-    customer_name = models.CharField(max_length=255, default='', blank=True)
-    customer_address = models.TextField(default='', blank=True)
-
-    # --- Tags & Notes ---
-    tags = models.CharField(max_length=500, default='', blank=True)
-
-    # --- Technician / Scheduling ---
-    tech_name = models.CharField(max_length=100, default='', blank=True)
-    promised_appointment = models.CharField(max_length=100, default='', blank=True)
-    created_date = models.CharField(max_length=100, default='', blank=True)
-    requested_date = models.CharField(max_length=100, default='', blank=True)
-    completed_date_str = models.CharField(max_length=100, default='', blank=True) # Renamed to avoid conflict with completion_date logic
-
-    # --- Task Info ---
-    task = models.TextField(default='', blank=True)
-    task_duration = models.CharField(max_length=100, default='', blank=True)
-
-    # --- Purchase Info ---
-    purchase_status = models.CharField(max_length=100, default='', blank=True)
-    purchase_status_name = models.CharField(max_length=100, default='', blank=True)
-
-    # --- Assignment Flags ---
+class BaseWorkOrder(models.Model):
+    """Abstract class to share fields between Active and Deleted Work Orders"""
+    priority_color = models.CharField(max_length=50, default='')
+    priority_name = models.CharField(max_length=100, default='')
+    work_order_number = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    customer_po = models.CharField(max_length=100, default='')
+    customer_name = models.CharField(max_length=200, default='')
+    customer_address = models.TextField(default='')
+    tags = models.TextField(default='')
+    tech_name = models.CharField(max_length=100, default='')
+    created_date = models.CharField(max_length=50, default='')
+    requested_date = models.CharField(max_length=50, default='')
+    completed_date_str = models.CharField(max_length=50, default='')  # String version from source
+    task = models.TextField(default='')
     serial = models.IntegerField(default=0)
-    assigned = models.BooleanField(default=False)
-    dispatched = models.BooleanField(default=False)
-    scheduled = models.BooleanField(default=False)
-    scheduled_date = models.CharField(max_length=100, default='', blank=True)
-
-    # --- Locate Call Tracking ---
+    scheduled_date = models.CharField(max_length=50, default='')
+    
+    # Call Status Logic
     locates_called = models.BooleanField(default=False)
-    call_type = models.CharField(max_length=50, null=True, blank=True) # STANDARD, EMERGENCY
+    CALL_TYPE_CHOICES = [
+        ('STANDARD', 'Standard'),
+        ('EMERGENCY', 'Emergency'),
+    ]
+    call_type = models.CharField(max_length=20, choices=CALL_TYPE_CHOICES, null=True, blank=True)
     called_at = models.DateTimeField(null=True, blank=True)
-    called_by = models.CharField(max_length=100, default='', blank=True)
-    called_by_email = models.CharField(max_length=100, default='', blank=True)
-
-    # --- Timer & Completion ---
+    called_by = models.CharField(max_length=100, default='')
+    called_by_email = models.CharField(max_length=100, default='')
+    
     completion_date = models.DateTimeField(null=True, blank=True)
     timer_started = models.BooleanField(default=False)
     timer_expired = models.BooleanField(default=False)
-    time_remaining = models.CharField(max_length=100, default='', blank=True)
-
-    # --- Manual Tagging ---
-    manually_tagged = models.BooleanField(default=False)
-    tagged_by = models.CharField(max_length=100, default='', blank=True)
-    tagged_by_email = models.CharField(max_length=100, default='', blank=True)
-    tagged_at = models.DateTimeField(null=True, blank=True)
-
-    # --- Workflow Status ---
-    WORKFLOW_CHOICES = (
-        ('CALL_NEEDED', 'CALL_NEEDED'),
-        ('IN_PROGRESS', 'IN_PROGRESS'),
-        ('COMPLETE', 'COMPLETE'),
-        ('UNKNOWN', 'UNKNOWN'),
-    )
-    workflow_status = models.CharField(max_length=20, choices=WORKFLOW_CHOICES, default='UNKNOWN')
-
-    # --- Classification ---
-    TYPE_CHOICES = (
-        ('STANDARD', 'STANDARD'),
-        ('EMERGENCY', 'EMERGENCY'),
-        ('EXCAVATOR', 'EXCAVATOR'),
-    )
-    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='STANDARD')
-
-    # --- Metadata (JSON) ---
-    metadata = models.JSONField(default=dict, blank=True)
+    time_remaining = models.CharField(max_length=50, default='')
+    
+    metadata = models.JSONField(default=dict)
 
     class Meta:
-        ordering = ['id']
+        abstract = True
+
+class WorkOrder(BaseWorkOrder):
+    dashboard = models.ForeignKey(DashboardData, on_delete=models.CASCADE, related_name='work_orders')
+    workflow_status = models.CharField(max_length=50, default='PENDING')
+
+    def __str__(self):
+        return self.work_order_number
+
+class DeletedWorkOrder(BaseWorkOrder):
+    dashboard = models.ForeignKey(DashboardData, on_delete=models.CASCADE, related_name='deleted_work_orders')
+    
+    # Deletion specific fields
+    deleted_at = models.DateTimeField(default=timezone.now)
+    deleted_by = models.CharField(max_length=100, default='')
+    deleted_by_email = models.CharField(max_length=100, default='')
+    deleted_from = models.CharField(max_length=50, default='Dashboard')
+    
+    original_work_order_id = models.IntegerField(null=True, blank=True) # ID reference
+    is_permanently_deleted = models.BooleanField(default=False)
+    permanently_deleted_at = models.DateTimeField(null=True, blank=True)
+    
+    restored = models.BooleanField(default=False)
+    restored_at = models.DateTimeField(null=True, blank=True)
+    restored_by = models.CharField(max_length=100, default='')
+    restored_by_email = models.CharField(max_length=100, default='')
+
+    class Meta:
+        ordering = ['-deleted_at']

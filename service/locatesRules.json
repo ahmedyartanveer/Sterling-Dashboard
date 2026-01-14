@@ -14,13 +14,10 @@
 
         "_comment_date": "Date format: 10-12-2023",
         "start_date": "",
-        "end_date": "",
-
+    
         "_comment_time": "Time format: 01:10 AM",
         "start_time": "",
-        "end_time": "",
-
-        "time_offset_minutes": 300,
+    
         "apply_button_xpath": ".plot-map-button:has-text('Apply')"
     }
 ]

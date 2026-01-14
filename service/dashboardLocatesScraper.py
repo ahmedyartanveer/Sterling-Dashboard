@@ -1,9 +1,9 @@
 import os
+import sys
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
-from datetime import datetime, timedelta
 from service.inseartLocates import InseartLocatesService
 
 # Load environment variables
@@ -12,6 +12,7 @@ RULES_FILE_PATH = os.getenv("RULES_FILE_PATH", "service/locatesRules.json")
 
 class FieldEdgeScraper:
     def __init__(self):
+        self.playwright = None  # Playwright instance store 
         self.browser = None
         self.context = None
         self.page = None
@@ -42,15 +43,15 @@ class FieldEdgeScraper:
 
     async def initialize(self):
         """Launches the browser"""
-        playwright = await async_playwright().start()
+        self.playwright = await async_playwright().start()
+        
         # Headless false and slow_mo matches your Node config
-        self.browser = await playwright.chromium.launch(headless=False, slow_mo=50)
+        self.browser = await self.playwright.chromium.launch(headless=False, slow_mo=50)
         self.context = await self.browser.new_context()
         self.page = await self.context.new_page()
 
     async def login(self):
         """Handles login logic"""
-        # await self.page.goto('https://login.fieldedge.com/Account/Login', wait_until='domcontentloaded')
         await self.page.fill(self.rules.get('username_xpath'), self.dash_email)
         await self.page.fill(self.rules.get('password_xpath'), self.dash_password)
 
@@ -66,8 +67,6 @@ class FieldEdgeScraper:
     
     async def select_checkbox_by_xpath(self, task_name):
         """Selects the label using XPath"""
-        
-        # normalize-space use kora hoyeche jeno html er age-pore space thakleo kaj kore
         task_btn_xpath = self.rules.get('task_dropdown_xpath', "//span[text()='Task']")
         xpath_selector = f"//label[normalize-space(text())='{task_name}']"
         task_btn = self.page.locator(task_btn_xpath)
@@ -83,7 +82,7 @@ class FieldEdgeScraper:
         else:
             print("Task button not found!")
 
-    async def set_date_filter(self, start_date, end_date, start_time='', end_time=''):
+    async def set_date_filter(self, start_date, end_date):
         """Sets the date filters in the UI"""
         date_filter_dropdown = self.page.locator('div.filter-dropdown:has(.time-filter) div.filter-text').first
         
@@ -95,20 +94,9 @@ class FieldEdgeScraper:
 
         await start_input.fill('')
         await start_input.fill(start_date)
-        await end_input.fill('')
         
         await end_input.fill('')
         await end_input.fill(end_date)
-
-        if start_time:
-            start_time_input = self.page.locator('#startTime')
-            await start_time_input.fill('')
-            await start_time_input.fill(start_time)
-
-        if end_time:
-            end_time_input = self.page.locator('#endTime')
-            await end_time_input.fill('')
-            await end_time_input.fill(end_time)
 
     async def apply_filters(self):
         """Clicks the apply button"""
@@ -123,15 +111,13 @@ class FieldEdgeScraper:
             await self.page.wait_for_selector('.kgRow', state='attached', timeout=60000)
         except Exception as e:
             print(f"Error waiting for selector: {e}")
-            return {'rows': []} # Return empty dict structure on error
+            return {'rows': []}
 
-        # 'r' is added before """ to make it a raw string (Fixes SyntaxWarning)
         scraped_data = await self.page.evaluate(r"""() => {
             const rows = [];
             
             const getTextByClass = (rowElement, classSelector) => {
                 const el = rowElement.querySelector(classSelector);
-                // Regex \s works correctly now because of raw string in Python
                 return el ? el.textContent.replace(/\s+/g, ' ').trim() : ''; 
             };
 
@@ -139,7 +125,6 @@ class FieldEdgeScraper:
 
             domRows.forEach((row, index) => {
                 try {
-                    // Mapping classes based on your HTML structure
                     const pColor = row.querySelector('.col0 div[style*="background-color"]')?.style.backgroundColor || '';
                     const pName = getTextByClass(row, '.col1');
                     const woNumber = getTextByClass(row, '.col2');
@@ -153,7 +138,9 @@ class FieldEdgeScraper:
                     const createdDate = getTextByClass(row, '.col10');
                     const scheduledDate = getTextByClass(row, '.col11');
                     const taskDuration = getTextByClass(row, '.col12');
-
+                    if (pName != "EXCAVATOR") {
+                        return; 
+                    }
                     rows.push({
                         priorityColor: pColor,
                         priorityName: pName,
@@ -175,7 +162,6 @@ class FieldEdgeScraper:
                 }
             });
 
-            // Returning an object/dictionary instead of array (Fixes list indices error)
             return { rows: rows, count: rows.length };
         }""")
 
@@ -189,12 +175,9 @@ class FieldEdgeScraper:
             # Go to Dispatch Board
             await self.page.goto(self.rules.get('web_url'), wait_until='domcontentloaded')
             
-            # Login if redirected (logic inferred from original script flow)
+            # Login if redirected
             if "Login" in self.page.url:
                 await self.login()
-                # Ensure we represent correct navigation after login if needed, 
-                # strictly following original script which explicitly goes to /Dispatch
-                # await self.page.goto('https://login.fieldedge.com/Dispatch', wait_until='domcontentloaded')
 
             await self.select_status(self.rules.get('status_name', "Assigned"))
             if self.rules.get('is_apply_task', False):
@@ -202,49 +185,64 @@ class FieldEdgeScraper:
 
             # Date Logic
             start_date = self.rules.get('start_date') or datetime.now().strftime('%m/%d/%Y')
-            # start_time = self.rules.get('start_time') or (datetime.now() - timedelta(minutes=self.rules.get('time_offset_minutes', 15))).strftime('%I:%M %p')
             end_date = self.rules.get('end_date') or datetime.now().strftime('%m/%d/%Y')
-            # end_time = self.rules.get('end_time') or datetime.now().strftime('%I:%M %p')
 
             await self.set_date_filter(start_date, end_date)
             await self.apply_filters()
-
             scraped = await self.scrape_data()
-            # print(f"{start_date} {start_time}")
-            # print(f"{end_date} {end_time}")
-            print(len(scraped))
             result = {
                 "filterStartDate": start_date,
                 "filterEndDate": end_date,
-                "totalWorkOrders": len(scraped['rows']),
                 "workOrders": scraped['rows'],
             }
 
             return result
 
         except Exception as e:
-            print(f"An error occurred: {e}")
+            # Short error message in terminal
+            print(f"Scraping Error: try again later.")
+            return None
         finally:
             if self.browser:
                 await self.browser.close()
+            if self.playwright:
+                await self.playwright.stop()
     
     def inseat_locates(self, locates_data):
         """Inserts locates data using InseartLocatesService"""
-        inserter = InseartLocatesService()
-        success = inserter.insert_locates(locates_data)
-        return success
+        try:
+            inserter = InseartLocatesService()
+            success = inserter.insert_locates(locates_data)
+            return success
+        except Exception as e:
+            print(f"DB Insertion Error: {e}")
+            return False
 
 # --- Execution ---
 async def main():
     scraper = FieldEdgeScraper()
     data = await scraper.run()
     if data:
-        scraper.inseat_locates(data)
+        if scraper.inseat_locates(data):
+            print("Data inserted successfully.")
+        else:
+            print("Failed to insert data.")
     else:
-        print("No data scraped.")
+        print("No data scraped or error occurred.")
     
     
 def start_scraping():
     print("Scraping started...")
-    asyncio.run(main())
+    
+    if sys.platform.startswith("win"):
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        print(f"Critical Loop Error: {e}")
+        
     print("Scraping finished.")
+
+if __name__ == "__main__":
+    start_scraping()
