@@ -1,298 +1,193 @@
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db.models import Q
-import datetime
-
-# --- SWAGGER IMPORTS ---
+from datetime import timedelta
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, permissions
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-# --- PROJECT IMPORTS ---
-# Only import Dashboard/Locates related models and serializers
-from .models import DashboardData, WorkOrder
+from .models import DashboardData, WorkOrder, DeletedWorkOrder
 from .serializers import (
-    DashboardDataSerializer, WorkOrderSerializer,
-    UpdateCallStatusInputSerializer, TagLocatesInputSerializer, 
-    BulkTagInputSerializer, BulkDeleteInputSerializer
+    DashboardDataSerializer, WorkOrderSerializer, DeletedWorkOrderSerializer,
+    SyncInputSerializer, UpdateCallStatusSerializer, BulkDeleteSerializer
 )
 
-class LocatesController(viewsets.GenericViewSet):
-    """
-    Handles Dashboard Sync, Work Order Management, Tagging, and Timer Logic.
-    No Auth logic here.
-    """
-    permission_classes = [IsAuthenticated]
-    queryset = DashboardData.objects.all() 
-    serializer_class = DashboardDataSerializer 
+class SyncDashboardView(APIView):
+    permission_classes = [permissions.IsAdminUser]  # Only Superadmin/Staff
 
-    # --- 1. Sync Dashboard ---
-    @swagger_auto_schema(request_body=DashboardDataSerializer)
-    @action(detail=False, methods=['post'], url_path='sync-dashboard')
-    def sync_dashboard(self, request):
+    @swagger_auto_schema(
+        request_body=SyncInputSerializer,
+        responses={201: DashboardDataSerializer},
+        operation_description="Sync dashboard data. Filters for EXCAVATOR and deduplicates."
+    )
+    def post(self, request):
         data = request.data
-        
-        # Create Dashboard Parent
+        raw_work_orders = data.get('workOrders', [])
+
+        # 1. Filter only EXCAVATOR
+        filtered_orders = [w for w in raw_work_orders if w.get('priorityName') == "EXCAVATOR"]
+
+        # 2. Deduplicate by workOrderNumber
+        unique_orders = []
+        seen = set()
+        for w in filtered_orders:
+            wo_num = w.get('workOrderNumber')
+            if wo_num and wo_num not in seen:
+                seen.add(wo_num)
+                unique_orders.append(w)
+
+        # 3. Create Dashboard Parent
         dashboard = DashboardData.objects.create(
             filter_start_date=data.get('filterStartDate'),
             filter_end_date=data.get('filterEndDate'),
-            total_work_orders=data.get('totalWorkOrders', 0),
-            source=data.get('source', 'external-dashboard')
+            total_work_orders=len(unique_orders)
         )
-        
-        # Create Nested Work Orders
-        work_orders_data = data.get('workOrders', [])
-        for wo in work_orders_data:
-            WorkOrder.objects.create(
-                dashboard=dashboard,
-                work_order_number=wo.get('workOrderNumber', 0),
-                priority_color=wo.get('priorityColor', ''),
-                priority_name=wo.get('priorityName', ''),
-                customer_name=wo.get('customerName', ''),
-                customer_address=wo.get('customerAddress', ''),
-                tags=wo.get('tags', ''),
-                tech_name=wo.get('techName', ''),
-                promised_appointment=wo.get('promisedAppointment', ''),
-                created_date=wo.get('createdDate', ''),
-                requested_date=wo.get('requestedDate', ''),
-                completed_date_str=wo.get('completedDate', ''),
-                task=wo.get('task', ''),
-                task_duration=wo.get('taskDuration', ''),
-                purchase_status=wo.get('purchaseStatus', ''),
-                purchase_status_name=wo.get('purchaseStatusName', ''),
-                serial=wo.get('serial', 0),
-                assigned=wo.get('assigned', False),
-                dispatched=wo.get('dispatched', False),
-                scheduled=wo.get('scheduled', False),
-                scheduled_date=wo.get('scheduledDate', '')
-            )
-            
-        return Response({'success': True, 'message': 'Dashboard synced successfully'}, status=status.HTTP_201_CREATED)
 
-    # --- 2. Get All Data ---
-    @action(detail=False, methods=['get'], url_path='all-locates')
-    def get_all_dashboard_data(self, request):
+        incoming_numbers = [wo.get('workOrderNumber') for wo in unique_orders if wo.get('workOrderNumber')]
+        existing_numbers = set(
+            WorkOrder.objects.filter(work_order_number__in=incoming_numbers)
+            .values_list('work_order_number', flat=True)
+        )
+        # 4. Bulk Create Work Orders
+        work_order_objects = []
+        for wo in unique_orders:
+            wo_number = wo.get('workOrderNumber', '')
+            
+            if wo_number in existing_numbers:
+                continue 
+
+            work_order_objects.append(
+                WorkOrder(
+                    dashboard=dashboard,
+                    priority_color=wo.get('priorityColor', ''),
+                    priority_name=wo.get('priorityName', ''),
+                    work_order_number=wo_number,
+                    customer_po=wo.get('customerPO', ''),
+                    customer_name=wo.get('customerName', ''),
+                    customer_address=wo.get('customerAddress', ''),
+                    tags=wo.get('tags', ''),
+                    tech_name=wo.get('techName', ''),
+                    created_date=wo.get('createdDate', ''),
+                    requested_date=wo.get('requestedDate', ''),
+                    completed_date_str=wo.get('completedDate', ''),
+                    task=wo.get('task', ''),
+                    serial=wo.get('serial', 0),
+                    scheduled_date=wo.get('scheduledDate', ''),
+                )
+            )
+
+        if work_order_objects:
+            WorkOrder.objects.bulk_create(work_order_objects)
+
+        serializer = DashboardDataSerializer(dashboard)
+        return Response({
+            'success': True,
+            'message': "Dashboard synced successfully",
+            'data': serializer.data
+        }, status=status.HTTP_201_CREATED)
+
+
+class DashboardListView(APIView):
+    @swagger_auto_schema(responses={200: DashboardDataSerializer(many=True)})
+    def get(self, request):
         dashboards = DashboardData.objects.all().order_by('-created_at')
         serializer = DashboardDataSerializer(dashboards, many=True)
-        return Response({
-            'success': True,
-            'total': dashboards.count(),
-            'data': serializer.data
-        })
+        return Response({'success': True, 'total': len(serializer.data), 'data': serializer.data})
 
-    # --- 3. Update Call Status (With Timer Logic) ---
-    @swagger_auto_schema(request_body=UpdateCallStatusInputSerializer)
-    @action(detail=True, methods=['patch'], url_path='update-call-status')
-    def update_work_order_call_status(self, request, pk=None):
-        try:
-            # Note: pk here is the WorkOrder ID (Django ID)
-            work_order = WorkOrder.objects.get(pk=pk)
-        except WorkOrder.DoesNotExist:
-            return Response({'success': False, 'message': 'Work order not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = UpdateCallStatusInputSerializer(data=request.data)
-        if not serializer.is_valid():
-             return Response({'success': False, 'message': str(serializer.errors)}, status=status.HTTP_400_BAD_REQUEST)
+class WorkOrderOperationsView(APIView):
+    """
+    Handles Delete (Soft), Update Call Status, Manual Complete
+    """
 
-        data = serializer.validated_data
+    @swagger_auto_schema(
+        operation_description="Delete Work Order (Soft Delete - Move to Recycle Bin)",
+        responses={200: "Work order moved to recycle bin successfully"}
+    )
+    def delete(self, request, pk):
+        work_order = get_object_or_404(WorkOrder, pk=pk)
+        dashboard = work_order.dashboard
         
-        # User Info (From Request or Input)
-        # Assuming request.user has 'name' or 'email' fields from your Auth App
-        user_name = getattr(request.user, 'name', 'Unknown Manager')
-        user_email = getattr(request.user, 'email', 'unknown@email.com')
+        # Create Deleted Entry
+        DeletedWorkOrder.objects.create(
+            dashboard=dashboard,
+            original_work_order_id=work_order.id,
+            work_order_number=work_order.work_order_number,
+            customer_name=work_order.customer_name,
+            customer_address=work_order.customer_address,
+            priority_name=work_order.priority_name,
+            priority_color=work_order.priority_color,
+            # Copy other fields as needed...
+            deleted_by=request.user.username if request.user.is_authenticated else 'Unknown',
+            deleted_by_email=request.user.email if request.user.is_authenticated else 'unknown@email.com',
+            metadata=work_order.metadata
+        )
 
-        called_by = data.get('calledBy') or user_name
-        called_by_email = data.get('calledByEmail') or user_email
+        # Delete Original
+        work_order.delete()
+        dashboard.update_counts()
 
-        # Update Basic Info
-        work_order.locates_called = data['locatesCalled']
+        return Response({'success': True, 'message': "Work order moved to recycle bin successfully"})
+
+
+class UpdateCallStatusView(APIView):
+    
+    @swagger_auto_schema(request_body=UpdateCallStatusSerializer)
+    def patch(self, request, pk):
+        work_order = get_object_or_404(WorkOrder, pk=pk)
+        serializer = UpdateCallStatusSerializer(data=request.data)
         
-        call_type = data.get('callType')
-        if call_type:
-            work_order.call_type = call_type.upper()
-            work_order.type = call_type.upper()
-
-        work_order.called_by = called_by
-        work_order.called_by_email = called_by_email
-        
-        called_at_date = data.get('calledAt') or timezone.now()
-        work_order.called_at = called_at_date
-
-        # --- Business Logic: Calculate Completion Date ---
-        if str(call_type).upper() == 'EMERGENCY':
-            # Emergency: +4 hours
-            work_order.completion_date = called_at_date + datetime.timedelta(hours=4)
-        else:
-            # Standard: +2 Business Days (Skipping Sat/Sun)
-            completion_date = called_at_date
-            business_days = 2
+        if serializer.is_valid():
+            data = serializer.validated_data
             
-            while business_days > 0:
-                completion_date += datetime.timedelta(days=1)
-                # 5 = Saturday, 6 = Sunday
-                if completion_date.weekday() < 5:
-                    business_days -= 1
+            work_order.locates_called = data['locatesCalled']
+            work_order.call_type = data.get('callType')
             
-            work_order.completion_date = completion_date
-
-        # Update Workflow Status
-        work_order.workflow_status = 'IN_PROGRESS'
-        work_order.timer_started = True
-        work_order.timer_expired = False
-        
-        # Update Metadata
-        meta = work_order.metadata or {}
-        meta['lastCallStatusUpdate'] = str(timezone.now())
-        meta['updatedBy'] = called_by
-        meta['updatedByEmail'] = called_by_email
-        work_order.metadata = meta
-        
-        work_order.save()
-        
-        return Response({
-            'success': True,
-            'message': 'Work order call status updated successfully',
-            'data': {
-                'workOrder': WorkOrderSerializer(work_order).data
-            }
-        })
-
-    # --- 4. Tag Locates Needed ---
-    @swagger_auto_schema(request_body=TagLocatesInputSerializer)
-    @action(detail=False, methods=['post'], url_path='tag-locates-needed')
-    def tag_locates_needed(self, request):
-        serializer = TagLocatesInputSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response({'success': False, 'message': str(serializer.errors)}, status=status.HTTP_400_BAD_REQUEST)
-        
-        data = serializer.validated_data
-        wo_number = data['workOrderNumber']
-        
-        work_order = WorkOrder.objects.filter(work_order_number=wo_number).first()
-        if not work_order:
-             return Response({'success': False, 'message': f'Work order {wo_number} not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Tagging Logic
-        work_order.manually_tagged = True
-        work_order.tagged_by = data['name']
-        work_order.tagged_by_email = data['email']
-        work_order.tagged_at = timezone.now()
-        
-        work_order.priority_name = 'EXCAVATOR'
-        work_order.priority_color = 'rgb(255, 102, 204)' # Pink Color
-        work_order.type = 'EXCAVATOR'
-        work_order.workflow_status = 'CALL_NEEDED'
-        
-        # Append Tags
-        new_tags = data.get('tags', '')
-        current_tags = work_order.tags or ''
-        
-        if new_tags:
-            work_order.tags = f"{current_tags}, {new_tags}".strip(', ')
-        elif 'Locates Needed' not in current_tags:
-            work_order.tags = f"{current_tags}, Locates Needed".strip(', ')
+            # User info
+            user_name = request.user.username if request.user.is_authenticated else data.get('calledBy', 'Unknown')
+            user_email = request.user.email if request.user.is_authenticated else data.get('calledByEmail', 'unknown@email.com')
+            work_order.called_by = user_name
+            work_order.called_by_email = user_email
             
-        # Metadata
-        meta = work_order.metadata or {}
-        meta['manuallyTaggedAt'] = str(timezone.now())
-        meta['tagAddedBy'] = data['name']
-        work_order.metadata = meta
-
-        work_order.save()
-        
-        return Response({
-            'success': True,
-            'message': f"Work order {wo_number} tagged successfully",
-            'data': WorkOrderSerializer(work_order).data
-        })
-
-    # --- 5. Bulk Tag ---
-    @swagger_auto_schema(request_body=BulkTagInputSerializer)
-    @action(detail=False, methods=['post'], url_path='bulk-tag-locates-needed')
-    def bulk_tag_locates_needed(self, request):
-        serializer = BulkTagInputSerializer(data=request.data)
-        if not serializer.is_valid(): 
-            return Response({'success': False, 'message': str(serializer.errors)}, status=status.HTTP_400_BAD_REQUEST)
-        
-        data = serializer.validated_data
-        results = {'successful': [], 'failed': []}
-        
-        for wo_number in data['workOrderNumbers']:
-            work_order = WorkOrder.objects.filter(work_order_number=wo_number).first()
-            if not work_order:
-                results['failed'].append({'workOrderNumber': wo_number, 'reason': 'Not Found'})
-                continue
+            # Date Logic
+            called_at_date = data.get('calledAt', timezone.now())
+            work_order.called_at = called_at_date
             
-            # Apply same tagging logic
-            work_order.manually_tagged = True
-            work_order.tagged_by = data['name']
-            work_order.tagged_by_email = data['email']
-            work_order.tagged_at = timezone.now()
-            work_order.priority_name = 'EXCAVATOR'
-            work_order.priority_color = 'rgb(255, 102, 204)'
-            work_order.type = 'EXCAVATOR'
-            work_order.workflow_status = 'CALL_NEEDED'
+            # Calculate Completion Date
+            if work_order.call_type == 'EMERGENCY':
+                work_order.completion_date = called_at_date + timedelta(hours=4)
+            else:
+                # Standard: 2 Business Days logic
+                completion_date = called_at_date
+                business_days = 2
+                while business_days > 0:
+                    completion_date += timedelta(days=1)
+                    # 0=Monday, 4=Friday, 5=Saturday, 6=Sunday
+                    if completion_date.weekday() < 5: 
+                        business_days -= 1
+                work_order.completion_date = completion_date
+
+            work_order.workflow_status = 'IN_PROGRESS'
+            work_order.timer_started = True
             
-            if data.get('tags'):
-                work_order.tags = f"{work_order.tags}, {data['tags']}".strip(', ')
-            elif 'Locates Needed' not in (work_order.tags or ''):
-                work_order.tags = f"{work_order.tags or ''}, Locates Needed".strip(', ')
+            # Update Metadata
+            work_order.metadata['lastCallStatusUpdate'] = str(timezone.now())
+            work_order.metadata['updatedBy'] = user_name
             
             work_order.save()
-            results['successful'].append({'workOrderNumber': wo_number})
             
-        return Response({
-            'success': True,
-            'message': f"Bulk tagging completed: {len(results['successful'])} success, {len(results['failed'])} failed",
-            'data': results
-        })
+            return Response({
+                'success': True,
+                'message': 'Work order call status updated successfully',
+                'data': WorkOrderSerializer(work_order).data
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # --- 6. Delete Single Work Order ---
-    @action(detail=True, methods=['delete'], url_path='work-order')
-    def delete_work_order(self, request, pk=None):
-        try:
-            work_order = WorkOrder.objects.get(pk=pk)
-            # Update parent total count before delete
-            dashboard = work_order.dashboard
-            work_order.delete()
-            
-            # Recalculate total
-            dashboard.total_work_orders = dashboard.workOrders.count()
-            dashboard.save()
-            
-            return Response({'success': True, 'message': 'Work order deleted successfully'})
-        except WorkOrder.DoesNotExist:
-            return Response({'success': False, 'message': 'Work order not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    # --- 7. Bulk Delete ---
-    @swagger_auto_schema(request_body=BulkDeleteInputSerializer)
-    @action(detail=False, methods=['delete'], url_path='work-order/bulk-delete')
-    def bulk_delete_work_orders(self, request):
-        ids = request.data.get('ids', [])
-        if not ids: 
-            return Response({'success': False, 'message': 'IDs required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get dashboards affected to update counts later
-        affected_dashboards_ids = WorkOrder.objects.filter(id__in=ids).values_list('dashboard_id', flat=True).distinct()
-        
-        deleted_count, _ = WorkOrder.objects.filter(id__in=ids).delete()
-        
-        # Update counts
-        for d_id in affected_dashboards_ids:
-            dash = DashboardData.objects.get(id=d_id)
-            dash.total_work_orders = dash.workOrders.count()
-            dash.save()
-        
-        return Response({'success': True, 'message': f"{deleted_count} work order(s) deleted successfully"})
-
-    # --- 8. Check Expired Timers ---
-    @action(detail=False, methods=['get'], url_path='check-expired-timers')
-    def check_expired_timers(self, request):
+class CheckExpiredTimersView(APIView):
+    def get(self, request):
         now = timezone.now()
-        
-        # Query: Called + Not Expired + Completion Date Passed
+        # Find active work orders where timer passed
         expired_orders = WorkOrder.objects.filter(
             locates_called=True,
             timer_expired=False,
@@ -303,25 +198,65 @@ class LocatesController(viewsets.GenericViewSet):
         for wo in expired_orders:
             wo.timer_expired = True
             wo.workflow_status = 'COMPLETE'
-            
-            meta = wo.metadata or {}
-            meta['timerExpiredAt'] = str(now)
-            meta['autoUpdatedAt'] = str(now)
-            wo.metadata = meta
-            
+            wo.metadata['timerExpiredAt'] = str(now)
             wo.save()
             count += 1
             
         return Response({
-            'success': True,
+            'success': True, 
             'message': f"Updated {count} expired work orders",
             'expiredCount': count
         })
+
+class RestoreWorkOrderView(APIView):
+    @swagger_auto_schema(
+        operation_description="Restore a deleted work order to active list",
+        responses={200: "Work order restored successfully"}
+    )
+    def post(self, request, dashboard_id, deleted_order_id):
+        deleted_wo = get_object_or_404(
+            DeletedWorkOrder, 
+            dashboard_id=dashboard_id, 
+            id=deleted_order_id, 
+            is_permanently_deleted=False
+        )
         
-    # --- 9. Get By Number ---
-    @action(detail=False, methods=['get'], url_path='work-order/(?P<wo_number>[^/.]+)')
-    def get_by_number(self, request, wo_number=None):
-        wo = WorkOrder.objects.filter(work_order_number=wo_number).first()
-        if not wo:
-             return Response({'success': False, 'message': 'Not Found'}, status=status.HTTP_404_NOT_FOUND)
-        return Response({'success': True, 'data': WorkOrderSerializer(wo).data})
+        # Create Active Work Order from Deleted Data
+        WorkOrder.objects.create(
+            dashboard=deleted_wo.dashboard,
+            work_order_number=deleted_wo.work_order_number,
+            priority_name=deleted_wo.priority_name,
+            priority_color=deleted_wo.priority_color,
+            customer_name=deleted_wo.customer_name,
+            customer_address=deleted_wo.customer_address,
+            # ... copy other fields ...
+            metadata={**deleted_wo.metadata, 'restored': True, 'restoredAt': str(timezone.now())}
+        )
+        
+        # Remove from Deleted Table
+        dashboard = deleted_wo.dashboard
+        deleted_wo.delete()
+        dashboard.update_counts()
+        
+        return Response({'success': True, 'message': "Work order restored successfully"})
+
+class BulkDeleteView(APIView):
+    @swagger_auto_schema(request_body=BulkDeleteSerializer)
+    def delete(self, request):
+        ids = request.data.get('ids', [])
+        work_orders = WorkOrder.objects.filter(id__in=ids)
+        
+        count = 0
+        for wo in work_orders:
+            DeletedWorkOrder.objects.create(
+                dashboard=wo.dashboard,
+                original_work_order_id=wo.id,
+                work_order_number=wo.work_order_number,
+                customer_name=wo.customer_name,
+                # Copy minimal fields for brevity
+                deleted_at=timezone.now()
+            )
+            wo.delete()
+            count += 1
+            
+        return Response({'success': True, 'message': f"{count} work orders moved to recycle bin"})
