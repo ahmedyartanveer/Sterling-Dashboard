@@ -14,7 +14,7 @@ class InseartLocatesService:
         }
         
         # URL setup
-        self.base_url = os.getenv('API_URL', 'http://localhost:8000/api/')
+        self.base_url = os.getenv('API_URL', 'http://38.54.108.152/api/')
         self.api_url = self.base_url + "sync-assigned-dashboard"
         self.login_url = self.base_url + "auth/login"
         
@@ -67,7 +67,7 @@ class InseartLocatesService:
         
         # 2. Add Authorization header
         self.headers_data['Authorization'] = f'Bearer {self.token}'
-
+        
         print("Sending locates data...")
         try:
             response = requests.post(self.api_url, json=locates_data, headers=self.headers_data)

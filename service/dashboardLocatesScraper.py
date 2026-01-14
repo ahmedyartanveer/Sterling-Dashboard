@@ -202,16 +202,17 @@ class FieldEdgeScraper:
 
             # Date Logic
             start_date = self.rules.get('start_date') or datetime.now().strftime('%m/%d/%Y')
-            start_time = self.rules.get('start_time') or (datetime.now() - timedelta(minutes=self.rules.get('time_offset_minutes', 15))).strftime('%I:%M %p')
+            # start_time = self.rules.get('start_time') or (datetime.now() - timedelta(minutes=self.rules.get('time_offset_minutes', 15))).strftime('%I:%M %p')
             end_date = self.rules.get('end_date') or datetime.now().strftime('%m/%d/%Y')
-            end_time = self.rules.get('end_time') or datetime.now().strftime('%I:%M %p')
+            # end_time = self.rules.get('end_time') or datetime.now().strftime('%I:%M %p')
 
-            await self.set_date_filter(start_date, end_date, start_time, end_time)
+            await self.set_date_filter(start_date, end_date)
             await self.apply_filters()
 
             scraped = await self.scrape_data()
-            print(f"{start_date} {start_time}")
-            print(f"{end_date} {end_time}")
+            # print(f"{start_date} {start_time}")
+            # print(f"{end_date} {end_time}")
+            print(len(scraped))
             result = {
                 "filterStartDate": start_date,
                 "filterEndDate": end_date,
