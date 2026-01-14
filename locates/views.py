@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
+from django.db import transaction
 
 from .models import DashboardData, WorkOrder, DeletedWorkOrder
 from .serializers import (
@@ -13,8 +13,9 @@ from .serializers import (
     SyncInputSerializer, UpdateCallStatusSerializer, BulkDeleteSerializer
 )
 
+
 class SyncDashboardView(APIView):
-    permission_classes = [permissions.IsAdminUser]  # Only Superadmin/Staff
+    permission_classes = [permissions.IsAdminUser]
 
     @swagger_auto_schema(
         request_body=SyncInputSerializer,
@@ -22,70 +23,106 @@ class SyncDashboardView(APIView):
         operation_description="Sync dashboard data. Filters for EXCAVATOR and deduplicates."
     )
     def post(self, request):
-        data = request.data
+        # 1. Validate Data using Serializer (Best Practice)
+        serializer = SyncInputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'success': False, 'message': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        
+        data = serializer.validated_data
         raw_work_orders = data.get('workOrders', [])
 
-        # 1. Filter only EXCAVATOR
-        filtered_orders = [w for w in raw_work_orders if w.get('priorityName') == "EXCAVATOR"]
+        # 2. Optimization: Filter & Deduplicate in ONE pass
+        # Dictionary ব্যবহার করলে অটোমেটিক ডুপ্লিকেট রিমুভ হয়ে যাবে এবং লুপ একবারই ঘুরবে।
+        # key = workOrderNumber, value = work_order_object
+        unique_orders_map = {}
+        
+        for wo in raw_work_orders:
+            wo_num = wo.get('workOrderNumber')
+            # Priority check এবং valid number check একসাথে
+            if wo.get('priorityName') == "EXCAVATOR" and wo_num:
+                # যদি আগে অ্যাড করা না থাকে তবেই অ্যাড করব (Keep First logic)
+                if wo_num not in unique_orders_map:
+                    unique_orders_map[wo_num] = wo
 
-        # 2. Deduplicate by workOrderNumber
-        unique_orders = []
-        seen = set()
-        for w in filtered_orders:
-            wo_num = w.get('workOrderNumber')
-            if wo_num and wo_num not in seen:
-                seen.add(wo_num)
-                unique_orders.append(w)
+        if not unique_orders_map:
+             return Response({
+                'success': True,
+                'message': "No EXCAVATOR work orders found.",
+                'data': None
+            }, status=status.HTTP_200_OK)
 
-        # 3. Create Dashboard Parent
-        dashboard = DashboardData.objects.create(
-            filter_start_date=data.get('filterStartDate'),
-            filter_end_date=data.get('filterEndDate'),
-            total_work_orders=len(unique_orders)
-        )
-
-        incoming_numbers = [wo.get('workOrderNumber') for wo in unique_orders if wo.get('workOrderNumber')]
+        # 3. Database Check: Find existing work orders in one query
+        # incoming numbers এর লিস্ট বের করা
+        incoming_numbers = list(unique_orders_map.keys())
+        
         existing_numbers = set(
             WorkOrder.objects.filter(work_order_number__in=incoming_numbers)
             .values_list('work_order_number', flat=True)
         )
-        # 4. Bulk Create Work Orders
-        work_order_objects = []
-        for wo in unique_orders:
-            wo_number = wo.get('workOrderNumber', '')
-            
-            if wo_number in existing_numbers:
-                continue 
 
-            work_order_objects.append(
-                WorkOrder(
-                    dashboard=dashboard,
-                    priority_color=wo.get('priorityColor', ''),
-                    priority_name=wo.get('priorityName', ''),
-                    work_order_number=wo_number,
-                    customer_po=wo.get('customerPO', ''),
-                    customer_name=wo.get('customerName', ''),
-                    customer_address=wo.get('customerAddress', ''),
-                    tags=wo.get('tags', ''),
-                    tech_name=wo.get('techName', ''),
-                    created_date=wo.get('createdDate', ''),
-                    requested_date=wo.get('requestedDate', ''),
-                    completed_date_str=wo.get('completedDate', ''),
-                    task=wo.get('task', ''),
-                    serial=wo.get('serial', 0),
-                    scheduled_date=wo.get('scheduledDate', ''),
+        # 4. Prepare list of NEW work orders only
+        # যেগুলোর নাম্বার DB তে নেই, শুধু সেগুলোই নিব
+        new_orders_data = [wo for num, wo in unique_orders_map.items() if num not in existing_numbers]
+
+        if not new_orders_data:
+            return Response({
+                'success': True,
+                'message': "No new work orders to sync (all exist).",
+                'data': None
+            }, status=status.HTTP_200_OK)
+
+        # 5. Atomic Transaction & Bulk Create (Data Integrity)
+        try:
+            with transaction.atomic():
+                # Create Dashboard Parent
+                dashboard = DashboardData.objects.create(
+                    filter_start_date=data.get('filterStartDate'),
+                    filter_end_date=data.get('filterEndDate'),
+                    total_work_orders=len(incoming_numbers) # Total unique attempts
                 )
-            )
 
-        if work_order_objects:
-            WorkOrder.objects.bulk_create(work_order_objects)
+                # Prepare Objects for Bulk Create
+                work_order_objects = [
+                    WorkOrder(
+                        dashboard=dashboard,
+                        priority_color=wo.get('priorityColor') or '',
+                        priority_name=wo.get('priorityName') or '',
+                        work_order_number=wo.get('workOrderNumber') or '',
+                        customer_po=wo.get('customerPO') or '',
+                        customer_name=wo.get('customerName') or '',
+                        customer_address=wo.get('customerAddress') or '',
+                        tags=wo.get('tags') or '',
+                        tech_name=wo.get('techName') or '',
+                        # Date fields: Handle empty strings cleanly
+                        created_date=wo.get('createdDate') or '',
+                        requested_date=wo.get('requestedDate') or '',
+                        completed_date_str=wo.get('completedDate') or '',
+                        task=wo.get('task') or '',
+                        serial=wo.get('serial', 0),
+                        scheduled_date=wo.get('scheduledDate') or '',
+                    )
+                    for wo in new_orders_data
+                ]
 
-        serializer = DashboardDataSerializer(dashboard)
-        return Response({
-            'success': True,
-            'message': "Dashboard synced successfully",
-            'data': serializer.data
-        }, status=status.HTTP_201_CREATED)
+                # Run single SQL query for all inserts
+                if work_order_objects:
+                    WorkOrder.objects.bulk_create(work_order_objects)
+                
+                response_serializer = DashboardDataSerializer(dashboard)
+                
+                return Response({
+                    'success': True,
+                    'message': "Dashboard synced successfully",
+                    'data': response_serializer.data
+                }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            # লগিং এখানে করা যেতে পারে
+            return Response({
+                'success': False,
+                'message': str(e),
+                'data': None
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class DashboardListView(APIView):
