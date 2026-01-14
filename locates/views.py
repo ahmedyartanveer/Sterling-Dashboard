@@ -1,299 +1,820 @@
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from datetime import timedelta
-from rest_framework.views import APIView
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status, permissions
-from drf_yasg.utils import swagger_auto_schema
-from django.db import transaction
+from django.utils import timezone
+from datetime import timedelta, datetime
+from django.db.models import Q
+from django.core.paginator import Paginator
 
 from .models import DashboardData, WorkOrder, DeletedWorkOrder
 from .serializers import (
     DashboardDataSerializer, WorkOrderSerializer, DeletedWorkOrderSerializer,
-    SyncInputSerializer, UpdateCallStatusSerializer, BulkDeleteSerializer
+    DashboardWithHistorySerializer, CallStatusUpdateSerializer, BulkDeleteSerializer, SyncInputSerializer
 )
 
 
-class SyncDashboardView(APIView):
-    permission_classes = [permissions.IsAdminUser]
+# Import your scraper services here
+# from .services import scrape_locates_dispatch_board, assigned_locates_dispatch_board
 
-    @swagger_auto_schema(
-        request_body=SyncInputSerializer,
-        responses={201: DashboardDataSerializer},
-        operation_description="Sync dashboard data. Filters for EXCAVATOR and deduplicates."
-    )
-    def post(self, request):
-        # 1. Validate Data using Serializer (Best Practice)
-        serializer = SyncInputSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response({'success': False, 'message': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+def sync_dashboard(request):
+    """Sync dashboard from scraper"""
+    try:
+        # Get data from request body
+        data = request.data
         
-        data = serializer.validated_data
-        raw_work_orders = data.get('workOrders', [])
-
-        # 2. Optimization: Filter & Deduplicate in ONE pass
-        # Dictionary ব্যবহার করলে অটোমেটিক ডুপ্লিকেট রিমুভ হয়ে যাবে এবং লুপ একবারই ঘুরবে।
-        # key = workOrderNumber, value = work_order_object
-        unique_orders_map = {}
-        
-        for wo in raw_work_orders:
-            wo_num = wo.get('workOrderNumber')
-            # Priority check এবং valid number check একসাথে
-            if wo.get('priorityName') == "EXCAVATOR" and wo_num:
-                # যদি আগে অ্যাড করা না থাকে তবেই অ্যাড করব (Keep First logic)
-                if wo_num not in unique_orders_map:
-                    unique_orders_map[wo_num] = wo
-
-        if not unique_orders_map:
-             return Response({
-                'success': True,
-                'message': "No EXCAVATOR work orders found.",
-                'data': None
-            }, status=status.HTTP_200_OK)
-
-        # 3. Database Check: Find existing work orders in one query
-        # incoming numbers এর লিস্ট বের করা
-        incoming_numbers = list(unique_orders_map.keys())
-        
-        existing_numbers = set(
-            WorkOrder.objects.filter(work_order_number__in=incoming_numbers)
-            .values_list('work_order_number', flat=True)
-        )
-
-        # 4. Prepare list of NEW work orders only
-        # যেগুলোর নাম্বার DB তে নেই, শুধু সেগুলোই নিব
-        new_orders_data = [wo for num, wo in unique_orders_map.items() if num not in existing_numbers]
-
-        if not new_orders_data:
-            return Response({
-                'success': True,
-                'message': "No new work orders to sync (all exist).",
-                'data': None
-            }, status=status.HTTP_200_OK)
-
-        # 5. Atomic Transaction & Bulk Create (Data Integrity)
-        try:
-            with transaction.atomic():
-                # Create Dashboard Parent
-                dashboard = DashboardData.objects.create(
-                    filter_start_date=data.get('filterStartDate'),
-                    filter_end_date=data.get('filterEndDate'),
-                    total_work_orders=len(incoming_numbers) # Total unique attempts
-                )
-
-                # Prepare Objects for Bulk Create
-                work_order_objects = [
-                    WorkOrder(
-                        dashboard=dashboard,
-                        priority_color=wo.get('priorityColor') or '',
-                        priority_name=wo.get('priorityName') or '',
-                        work_order_number=wo.get('workOrderNumber') or '',
-                        customer_po=wo.get('customerPO') or '',
-                        customer_name=wo.get('customerName') or '',
-                        customer_address=wo.get('customerAddress') or '',
-                        tags=wo.get('tags') or '',
-                        tech_name=wo.get('techName') or '',
-                        # Date fields: Handle empty strings cleanly
-                        created_date=wo.get('createdDate') or '',
-                        requested_date=wo.get('requestedDate') or '',
-                        completed_date_str=wo.get('completedDate') or '',
-                        task=wo.get('task') or '',
-                        serial=wo.get('serial', 0),
-                        scheduled_date=wo.get('scheduledDate') or '',
-                    )
-                    for wo in new_orders_data
-                ]
-
-                # Run single SQL query for all inserts
-                if work_order_objects:
-                    WorkOrder.objects.bulk_create(work_order_objects)
-                
-                response_serializer = DashboardDataSerializer(dashboard)
-                
-                return Response({
-                    'success': True,
-                    'message': "Dashboard synced successfully",
-                    'data': response_serializer.data
-                }, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            # লগিং এখানে করা যেতে পারে
+        # Validate required fields
+        if 'workOrders' not in data:
             return Response({
                 'success': False,
-                'message': str(e),
-                'data': None
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-class DashboardListView(APIView):
-    @swagger_auto_schema(responses={200: DashboardDataSerializer(many=True)})
-    def get(self, request):
-        dashboards = DashboardData.objects.all().order_by('-created_at')
-        serializer = DashboardDataSerializer(dashboards, many=True)
-        return Response({'success': True, 'total': len(serializer.data), 'data': serializer.data})
-
-
-class WorkOrderOperationsView(APIView):
-    """
-    Handles Delete (Soft), Update Call Status, Manual Complete
-    """
-
-    @swagger_auto_schema(
-        operation_description="Delete Work Order (Soft Delete - Move to Recycle Bin)",
-        responses={200: "Work order moved to recycle bin successfully"}
-    )
-    def delete(self, request, pk):
-        work_order = get_object_or_404(WorkOrder, pk=pk)
-        dashboard = work_order.dashboard
+                'message': 'work_orders field is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create Deleted Entry
-        DeletedWorkOrder.objects.create(
-            dashboard=dashboard,
-            original_work_order_id=work_order.id,
-            work_order_number=work_order.work_order_number,
-            customer_name=work_order.customer_name,
-            customer_address=work_order.customer_address,
-            priority_name=work_order.priority_name,
-            priority_color=work_order.priority_color,
-            # Copy other fields as needed...
-            deleted_by=request.user.username if request.user.is_authenticated else 'Unknown',
-            deleted_by_email=request.user.email if request.user.is_authenticated else 'unknown@email.com',
-            metadata=work_order.metadata
+        workOrders = data.get('workOrders', [])
+        
+        # Deduplicate by workOrderNumber and check database
+        unique = []
+        seen = set()
+        
+        for w in workOrders:
+            wo_number = w.get('workOrderNumber')
+            
+            # Skip if no workOrderNumber
+            if not wo_number:
+                continue
+            
+            # Skip if already seen in current batch
+            if wo_number in seen:
+                continue
+            
+            # Skip if already exists in database
+            if WorkOrder.objects.filter(work_order_number=wo_number).exists():
+                continue
+            
+            seen.add(wo_number)
+            unique.append(w)
+        
+        # Check if there are any work orders after filtering and deduplication
+        if not unique:
+            return Response({
+                'success': False,
+                'message': 'No new unique EXCAVATOR work orders found'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create dashboard only if work orders exist
+        dashboard = DashboardData.objects.create(
+            filter_start_date=data.get('filterStartDate', ''),
+            filter_end_date=data.get('filterEndDate', ''),
         )
-
-        # Delete Original
-        work_order.delete()
-        dashboard.update_counts()
-
-        return Response({'success': True, 'message': "Work order moved to recycle bin successfully"})
-
-
-class UpdateCallStatusView(APIView):
-    
-    @swagger_auto_schema(request_body=UpdateCallStatusSerializer)
-    def patch(self, request, pk):
-        work_order = get_object_or_404(WorkOrder, pk=pk)
-        serializer = UpdateCallStatusSerializer(data=request.data)
         
-        if serializer.is_valid():
-            data = serializer.validated_data
-            
-            work_order.locates_called = data['locatesCalled']
-            work_order.call_type = data.get('callType')
-            
-            # User info
-            user_name = request.user.username if request.user.is_authenticated else data.get('calledBy', 'Unknown')
-            user_email = request.user.email if request.user.is_authenticated else data.get('calledByEmail', 'unknown@email.com')
-            work_order.called_by = user_name
-            work_order.called_by_email = user_email
-            
-            # Date Logic
-            called_at_date = data.get('calledAt', timezone.now())
-            work_order.called_at = called_at_date
-            
-            # Calculate Completion Date
-            if work_order.call_type == 'EMERGENCY':
-                work_order.completion_date = called_at_date + timedelta(hours=4)
-            else:
-                # Standard: 2 Business Days logic
-                completion_date = called_at_date
-                business_days = 2
-                while business_days > 0:
-                    completion_date += timedelta(days=1)
-                    # 0=Monday, 4=Friday, 5=Saturday, 6=Sunday
-                    if completion_date.weekday() < 5: 
-                        business_days -= 1
-                work_order.completion_date = completion_date
+        # Create work orders
+        for wo_data in unique:
+            WorkOrder.objects.create(
+                dashboard=dashboard,
+                priority_color=wo_data.get('priorityColor', ''),
+                priority_name=wo_data.get('priorityName', ''),
+                work_order_number=wo_data.get('workOrderNumber', ''),
+                customer_po=wo_data.get('customerPO', ''),
+                customer_name=wo_data.get('customerName', ''),
+                customer_address=wo_data.get('customerAddress', ''),
+                tags=wo_data.get('tags', ''),
+                tech_name=wo_data.get('techName', ''),
+                created_date=wo_data.get('createdDate', ''),
+                task=wo_data.get('task', ''),
+                scheduled_date=wo_data.get('scheduledDate', ''),
+            )
+        
+        dashboard.save()  # Trigger count updates
+        
+        serializer = DashboardDataSerializer(dashboard)
+        return Response({
+            'success': True,
+            'message': f'Dashboard synced successfully with {len(unique)} new work orders',
+            'data': serializer.data
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            work_order.workflow_status = 'IN_PROGRESS'
-            work_order.timer_started = True
+
+@api_view(['GET'])
+def sync_assigned_dashboard(request):
+    """Sync assigned dashboard from scraper"""
+    try:
+        # Call your scraper service
+        # data = assigned_locates_dispatch_board()
+        
+        # For now, return placeholder
+        data = {
+            'work_orders': [],
+            'filter_start_date': '',
+            'filter_end_date': ''
+        }
+        
+        if isinstance(data.get('work_orders'), list):
+            filtered = [w for w in data['work_orders'] if w.get('priority_name') == 'EXCAVATOR']
             
-            # Update Metadata
-            work_order.metadata['lastCallStatusUpdate'] = str(timezone.now())
-            work_order.metadata['updatedBy'] = user_name
+            seen = set()
+            unique = []
             
-            work_order.save()
+            for w in filtered:
+                wo_number = w.get('work_order_number')
+                if wo_number and wo_number not in seen:
+                    seen.add(wo_number)
+                    unique.append(w)
             
+            # Create dashboard
+            dashboard = DashboardData.objects.create(
+                filter_start_date=data.get('filter_start_date', ''),
+                filter_end_date=data.get('filter_end_date', ''),
+            )
+            
+            # Create work orders
+            for wo_data in unique:
+                WorkOrder.objects.create(
+                    dashboard=dashboard,
+                    **wo_data
+                )
+            
+            dashboard.save()
+            
+            serializer = DashboardDataSerializer(dashboard)
             return Response({
                 'success': True,
-                'message': 'Work order call status updated successfully',
-                'data': WorkOrderSerializer(work_order).data
+                'message': 'Dashboard synced successfully',
+                'data': serializer.data
             })
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class CheckExpiredTimersView(APIView):
-    def get(self, request):
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_dashboard_data(request):
+    """Get all dashboard data"""
+    try:
+        data = DashboardData.objects.all().order_by('-created_at')
+        serializer = DashboardDataSerializer(data, many=True)
+        
+        return Response({
+            'success': True,
+            'total': data.count(),
+            'data': serializer.data
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_work_order(request, id):
+    """Delete a single work order (move to recycle bin)"""
+    try:
+        work_order = WorkOrder.objects.filter(id=id).first()
+        
+        if not work_order:
+            return Response({
+                'success': False,
+                'message': 'Work order not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        dashboard = work_order.dashboard
+        
+        # Create deleted work order
+        deleted_wo = DeletedWorkOrder.objects.create(
+            dashboard=dashboard,
+            priority_color=work_order.priority_color,
+            priority_name=work_order.priority_name,
+            work_order_number=work_order.work_order_number,
+            customer_po=work_order.customer_po,
+            customer_name=work_order.customer_name,
+            customer_address=work_order.customer_address,
+            tags=work_order.tags,
+            tech_name=work_order.tech_name,
+            created_date=work_order.created_date,
+            requested_date=work_order.requested_date,
+            completed_date=work_order.completed_date,
+            task=work_order.task,
+            serial=work_order.serial,
+            scheduled_date=work_order.scheduled_date,
+            locates_called=work_order.locates_called,
+            call_type=work_order.call_type,
+            called_at=work_order.called_at,
+            called_by=work_order.called_by,
+            called_by_email=work_order.called_by_email,
+            completion_date=work_order.completion_date,
+            timer_started=work_order.timer_started,
+            timer_expired=work_order.timer_expired,
+            time_remaining=work_order.time_remaining,
+            metadata=work_order.metadata,
+            deleted_by=request.user.get_full_name() or request.user.username,
+            deleted_by_email=request.user.email,
+            deleted_from='Dashboard',
+            is_permanently_deleted=False,
+            original_work_order_id=work_order.id
+        )
+        
+        # Delete original work order
+        work_order.delete()
+        
+        # Update dashboard counts
+        dashboard.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Work order moved to recycle bin successfully',
+            'data': {
+                'dashboard': DashboardDataSerializer(dashboard).data,
+                'deleted_work_order': DeletedWorkOrderSerializer(deleted_wo).data
+            }
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def bulk_delete_work_orders(request):
+    """Bulk delete work orders"""
+    try:
+        serializer = BulkDeleteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({
+                'success': False,
+                'message': 'Please provide an array of work order IDs'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        ids = serializer.validated_data['ids']
+        
+        work_orders = WorkOrder.objects.filter(id__in=ids).select_related('dashboard')
+        
+        if not work_orders.exists():
+            return Response({
+                'success': False,
+                'message': 'No matching work orders found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        deleted_count = 0
+        dashboards_to_update = set()
+        
+        for work_order in work_orders:
+            dashboard = work_order.dashboard
+            dashboards_to_update.add(dashboard.id)
+            
+            # Create deleted work order
+            DeletedWorkOrder.objects.create(
+                dashboard=dashboard,
+                priority_color=work_order.priority_color,
+                priority_name=work_order.priority_name,
+                work_order_number=work_order.work_order_number,
+                customer_po=work_order.customer_po,
+                customer_name=work_order.customer_name,
+                customer_address=work_order.customer_address,
+                tags=work_order.tags,
+                tech_name=work_order.tech_name,
+                created_date=work_order.created_date,
+                requested_date=work_order.requested_date,
+                completed_date=work_order.completed_date,
+                task=work_order.task,
+                serial=work_order.serial,
+                scheduled_date=work_order.scheduled_date,
+                locates_called=work_order.locates_called,
+                call_type=work_order.call_type,
+                called_at=work_order.called_at,
+                called_by=work_order.called_by,
+                called_by_email=work_order.called_by_email,
+                completion_date=work_order.completion_date,
+                timer_started=work_order.timer_started,
+                timer_expired=work_order.timer_expired,
+                time_remaining=work_order.time_remaining,
+                metadata=work_order.metadata,
+                deleted_by=request.user.get_full_name() or request.user.username,
+                deleted_by_email=request.user.email,
+                deleted_from='Dashboard',
+                is_permanently_deleted=False,
+                original_work_order_id=work_order.id
+            )
+            deleted_count += 1
+        
+        # Delete work orders
+        work_orders.delete()
+        
+        # Update dashboard counts
+        for dashboard_id in dashboards_to_update:
+            dashboard = DashboardData.objects.get(id=dashboard_id)
+            dashboard.save()
+        
+        return Response({
+            'success': True,
+            'message': f'{deleted_count} work order(s) moved to recycle bin successfully',
+            'deleted_count': deleted_count
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_work_order_call_status(request, id):
+    """Update work order call status"""
+    try:
+        serializer = CallStatusUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({
+                'success': False,
+                'message': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        work_order = WorkOrder.objects.filter(id=id).first()
+        
+        if not work_order:
+            return Response({
+                'success': False,
+                'message': 'Work order not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        data = serializer.validated_data
+        called_by_name = request.user.get_full_name() or request.user.username or data.get('called_by', 'Unknown Manager')
+        called_by_email = request.user.email or data.get('called_by_email', 'unknown@email.com')
+        
+        work_order.locates_called = data['locates_called']
+        
+        if 'call_type' in data and data['call_type']:
+            work_order.call_type = data['call_type'].upper()
+        
+        work_order.called_by = called_by_name
+        work_order.called_by_email = called_by_email
+        
+        called_at_date = data.get('called_at') or timezone.now()
+        work_order.called_at = called_at_date
+        
+        # Calculate completion date
+        if work_order.call_type == 'EMERGENCY':
+            work_order.completion_date = called_at_date + timedelta(hours=4)
+        else:
+            completion_date = called_at_date
+            business_days = 2
+            
+            while business_days > 0:
+                completion_date += timedelta(days=1)
+                if completion_date.weekday() < 5:  # Monday = 0, Sunday = 6
+                    business_days -= 1
+            
+            work_order.completion_date = completion_date
+        
+        work_order.timer_started = True
+        work_order.timer_expired = False
+        
+        if not work_order.metadata:
+            work_order.metadata = {}
+        
+        work_order.metadata.update({
+            'last_call_status_update': timezone.now().isoformat(),
+            'updated_by': called_by_name,
+            'updated_by_email': called_by_email,
+            'updated_at': timezone.now().isoformat()
+        })
+        
+        work_order.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Work order call status updated successfully',
+            'data': {
+                'work_order': WorkOrderSerializer(work_order).data,
+                'updates': {
+                    'locates_called': work_order.locates_called,
+                    'call_type': work_order.call_type,
+                    'called_at': work_order.called_at,
+                    'called_by': work_order.called_by,
+                    'called_by_email': work_order.called_by_email,
+                    'completion_date': work_order.completion_date,
+                }
+            }
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_and_update_expired_timers(request):
+    """Check and update expired timers"""
+    try:
         now = timezone.now()
-        # Find active work orders where timer passed
-        expired_orders = WorkOrder.objects.filter(
+        
+        work_orders = WorkOrder.objects.filter(
             locates_called=True,
             timer_expired=False,
             completion_date__lt=now
         )
         
-        count = 0
-        for wo in expired_orders:
-            wo.timer_expired = True
-            wo.workflow_status = 'COMPLETE'
-            wo.metadata['timerExpiredAt'] = str(now)
-            wo.save()
-            count += 1
+        expired_count = 0
+        
+        for work_order in work_orders:
+            work_order.timer_expired = True
             
+            if not work_order.metadata:
+                work_order.metadata = {}
+            
+            work_order.metadata.update({
+                'timer_expired_at': now.isoformat(),
+                'auto_updated_at': now.isoformat()
+            })
+            
+            work_order.save()
+            expired_count += 1
+        
         return Response({
-            'success': True, 
-            'message': f"Updated {count} expired work orders",
-            'expiredCount': count
+            'success': True,
+            'message': f'Updated {expired_count} expired work orders',
+            'expired_count': expired_count
         })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class RestoreWorkOrderView(APIView):
-    @swagger_auto_schema(
-        operation_description="Restore a deleted work order to active list",
-        responses={200: "Work order restored successfully"}
-    )
-    def post(self, request, dashboard_id, deleted_order_id):
-        deleted_wo = get_object_or_404(
-            DeletedWorkOrder, 
-            dashboard_id=dashboard_id, 
-            id=deleted_order_id, 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_work_order_by_number(request, work_order_number):
+    """Get work order by number"""
+    try:
+        work_order = WorkOrder.objects.filter(
+            work_order_number=str(work_order_number)
+        ).first()
+        
+        if not work_order:
+            return Response({
+                'success': False,
+                'message': f'Work order {work_order_number} not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        return Response({
+            'success': True,
+            'data': WorkOrderSerializer(work_order).data
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def complete_work_order_manually(request, id):
+    """Complete work order manually"""
+    try:
+        work_order = WorkOrder.objects.filter(id=id).first()
+        
+        if not work_order:
+            return Response({
+                'success': False,
+                'message': 'Work order not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        work_order.timer_expired = False
+        work_order.timer_started = False
+        
+        if not work_order.metadata:
+            work_order.metadata = {}
+        
+        work_order.metadata.update({
+            'completed_manually': True,
+            'completed_at': timezone.now().isoformat(),
+            'completed_by': request.user.get_full_name() or request.user.username,
+            'completed_by_email': request.user.email
+        })
+        
+        work_order.completion_date = timezone.now()
+        work_order.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Work order marked as COMPLETE successfully',
+            'data': WorkOrderSerializer(work_order).data
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_deleted_history(request):
+    """Get deleted work orders history"""
+    try:
+        page = int(request.GET.get('page', 1))
+        limit = int(request.GET.get('limit', 20))
+        search = request.GET.get('search', '')
+        
+        # Get all deleted work orders
+        queryset = DeletedWorkOrder.objects.filter(
             is_permanently_deleted=False
-        )
+        ).select_related('dashboard').order_by('-deleted_at')
         
-        # Create Active Work Order from Deleted Data
-        WorkOrder.objects.create(
-            dashboard=deleted_wo.dashboard,
-            work_order_number=deleted_wo.work_order_number,
-            priority_name=deleted_wo.priority_name,
-            priority_color=deleted_wo.priority_color,
-            customer_name=deleted_wo.customer_name,
-            customer_address=deleted_wo.customer_address,
-            # ... copy other fields ...
-            metadata={**deleted_wo.metadata, 'restored': True, 'restoredAt': str(timezone.now())}
-        )
-        
-        # Remove from Deleted Table
-        dashboard = deleted_wo.dashboard
-        deleted_wo.delete()
-        dashboard.update_counts()
-        
-        return Response({'success': True, 'message': "Work order restored successfully"})
-
-class BulkDeleteView(APIView):
-    @swagger_auto_schema(request_body=BulkDeleteSerializer)
-    def delete(self, request):
-        ids = request.data.get('ids', [])
-        work_orders = WorkOrder.objects.filter(id__in=ids)
-        
-        count = 0
-        for wo in work_orders:
-            DeletedWorkOrder.objects.create(
-                dashboard=wo.dashboard,
-                original_work_order_id=wo.id,
-                work_order_number=wo.work_order_number,
-                customer_name=wo.customer_name,
-                # Copy minimal fields for brevity
-                deleted_at=timezone.now()
+        # Apply search filter
+        if search:
+            queryset = queryset.filter(
+                Q(work_order_number__icontains=search) |
+                Q(customer_name__icontains=search) |
+                Q(customer_address__icontains=search) |
+                Q(deleted_by__icontains=search)
             )
-            wo.delete()
-            count += 1
-            
-        return Response({'success': True, 'message': f"{count} work orders moved to recycle bin"})
+        
+        # Paginate
+        paginator = Paginator(queryset, limit)
+        page_obj = paginator.get_page(page)
+        
+        serializer = DeletedWorkOrderSerializer(page_obj, many=True)
+        
+        return Response({
+            'success': True,
+            'data': serializer.data,
+            'pagination': {
+                'current_page': page,
+                'total_pages': paginator.num_pages,
+                'total_records': paginator.count,
+                'limit': limit
+            }
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_dashboard_with_history(request, id):
+    """Get dashboard with history"""
+    try:
+        dashboard = DashboardData.objects.filter(id=id).first()
+        
+        if not dashboard:
+            return Response({
+                'success': False,
+                'message': 'Dashboard not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = DashboardWithHistorySerializer(dashboard)
+        
+        return Response({
+            'success': True,
+            'data': {
+                'dashboard': serializer.data,
+                'active_work_orders': serializer.data['active_work_orders'],
+                'deleted_work_orders': serializer.data['deleted_work_orders_list'],
+                'permanently_deleted_work_orders': serializer.data['permanently_deleted_work_orders']
+            }
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def restore_work_order(request, dashboard_id, deleted_order_id):
+    """Restore a deleted work order"""
+    try:
+        dashboard = DashboardData.objects.filter(id=dashboard_id).first()
+        
+        if not dashboard:
+            return Response({
+                'success': False,
+                'message': 'Dashboard not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        deleted_order = DeletedWorkOrder.objects.filter(
+            Q(id=deleted_order_id) | Q(original_work_order_id=deleted_order_id),
+            dashboard=dashboard,
+            is_permanently_deleted=False
+        ).first()
+        
+        if not deleted_order:
+            return Response({
+                'success': False,
+                'message': 'Deleted work order not found or already permanently deleted'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Create restored work order
+        restored_wo = WorkOrder.objects.create(
+            dashboard=dashboard,
+            priority_color=deleted_order.priority_color,
+            priority_name=deleted_order.priority_name,
+            work_order_number=deleted_order.work_order_number,
+            customer_po=deleted_order.customer_po,
+            customer_name=deleted_order.customer_name,
+            customer_address=deleted_order.customer_address,
+            tags=deleted_order.tags,
+            tech_name=deleted_order.tech_name,
+            created_date=deleted_order.created_date,
+            requested_date=deleted_order.requested_date,
+            completed_date=deleted_order.completed_date,
+            task=deleted_order.task,
+            serial=deleted_order.serial,
+            scheduled_date=deleted_order.scheduled_date,
+            locates_called=deleted_order.locates_called,
+            call_type=deleted_order.call_type,
+            called_at=deleted_order.called_at,
+            called_by=deleted_order.called_by,
+            called_by_email=deleted_order.called_by_email,
+            completion_date=deleted_order.completion_date,
+            timer_started=deleted_order.timer_started,
+            timer_expired=deleted_order.timer_expired,
+            time_remaining=deleted_order.time_remaining,
+            metadata={
+                **deleted_order.metadata,
+                'restored': True,
+                'restored_at': timezone.now().isoformat(),
+                'restored_by': request.user.get_full_name() or request.user.username,
+                'restored_by_email': request.user.email
+            }
+        )
+        
+        # Delete from deleted work orders
+        deleted_order.delete()
+        
+        # Update dashboard counts
+        dashboard.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Work order restored successfully',
+            'data': {
+                'dashboard': DashboardDataSerializer(dashboard).data,
+                'restored_work_order': WorkOrderSerializer(restored_wo).data
+            }
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def permanently_delete_from_history(request, dashboard_id, deleted_order_id):
+    """Permanently delete from history"""
+    try:
+        dashboard = DashboardData.objects.filter(id=dashboard_id).first()
+        
+        if not dashboard:
+            return Response({
+                'success': False,
+                'message': 'Dashboard not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        deleted_order = DeletedWorkOrder.objects.filter(
+            Q(id=deleted_order_id) | Q(original_work_order_id=deleted_order_id),
+            dashboard=dashboard
+        ).first()
+        
+        if not deleted_order:
+            return Response({
+                'success': False,
+                'message': 'Deleted work order not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        deleted_data = DeletedWorkOrderSerializer(deleted_order).data
+        deleted_order.delete()
+        
+        dashboard.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Work order permanently deleted from database',
+            'data': deleted_data
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def bulk_permanently_delete(request):
+    """Bulk permanently delete"""
+    try:
+        serializer = BulkDeleteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({
+                'success': False,
+                'message': 'Please provide an array of deleted work order IDs'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        ids = serializer.validated_data['ids']
+        
+        deleted_orders = DeletedWorkOrder.objects.filter(
+            Q(id__in=ids) | Q(original_work_order_id__in=ids)
+        )
+        
+        if not deleted_orders.exists():
+            return Response({
+                'success': False,
+                'message': 'No matching deleted work orders found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        deleted_count = deleted_orders.count()
+        deleted_items = list(deleted_orders.values()[:10])
+        
+        dashboards_to_update = set(deleted_orders.values_list('dashboard_id', flat=True))
+        deleted_orders.delete()
+        
+        # Update dashboard counts
+        for dashboard_id in dashboards_to_update:
+            dashboard = DashboardData.objects.get(id=dashboard_id)
+            dashboard.save()
+        
+        return Response({
+            'success': True,
+            'message': f'{deleted_count} record(s) permanently deleted from database',
+            'deleted_count': deleted_count,
+            'deleted_items': deleted_items
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def clear_all_history(request):
+    """Clear all history"""
+    try:
+        dashboards_with_deleted = DashboardData.objects.filter(
+            deleted_work_orders__isnull=False
+        ).distinct()
+        
+        cleared_count = 0
+        dashboard_ids = []
+        
+        for dashboard in dashboards_with_deleted:
+            count = dashboard.deleted_work_orders.count()
+            cleared_count += count
+            dashboard_ids.append(dashboard.id)
+            dashboard.deleted_work_orders.all().delete()
+        
+        # Update dashboard counts
+        for dashboard_id in dashboard_ids:
+            dashboard = DashboardData.objects.get(id=dashboard_id)
+            dashboard.save()
+        
+        return Response({
+            'success': True,
+            'message': f'{cleared_count} history records permanently deleted from database',
+            'cleared_count': cleared_count
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
