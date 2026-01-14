@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+from datetime import timedelta
 
 load_dotenv()
 
@@ -170,13 +171,11 @@ AUTH_USER_MODEL = 'accounts.User' # Custom User Model Using Email for Authentica
 
 
 # Optional: JWT Configuration (Lifetime, etc.)
-from datetime import timedelta
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'AUTH_HEADER_TYPES': ('Bearer',), # This defines the prefix "Bearer"
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=365*100), 
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=365*100),
+    'AUTH_HEADER_TYPES': ('Bearer',), 
 }
-
 # CORS Configuration
 # ------------------------------------------------------------------------------
 # If True, the whitelist will not be used and all origins will be accepted.
