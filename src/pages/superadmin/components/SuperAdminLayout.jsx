@@ -32,7 +32,7 @@ export const SuperAdminLayout = () => {
             }
         }
 
-        if (currentPath === '/superadmin-dashboard') {
+        if (currentPath === '/super-admin-dashboard') {
             return 'Dashboard';
         }
         

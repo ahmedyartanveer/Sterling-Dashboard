@@ -69,12 +69,12 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                 {
                     text: 'Dashboard',
                     icon: <LayoutDashboard size={18} />,
-                    path: '/superadmin-dashboard',
+                    path: '/super-admin-dashboard',
                 },
                 {
                     text: 'Overview',
                     icon: <BarChart3 size={18} />,
-                    path: '/superadmin-dashboard/overview',
+                    path: '/super-admin-dashboard/overview',
                 },
                 {
                     text: 'Operations',
@@ -85,17 +85,17 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                         {
                             text: 'Dispatch',
                             icon: <Truck size={16} />,
-                            path: '/superadmin-dashboard/dispatch',
+                            path: '/super-admin-dashboard/dispatch',
                         },
                         {
                             text: 'Logistics Map',
                             icon: <Map size={16} />,
-                            path: '/superadmin-dashboard/logistics-map',
+                            path: '/super-admin-dashboard/logistics-map',
                         },
                         {
                             text: 'Locates',
                             icon: <MapPin size={16} />,
-                            path: '/superadmin-dashboard/locates',
+                            path: '/super-admin-dashboard/locates',
                         },
                     ],
                 },
@@ -108,12 +108,12 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                         {
                             text: 'Installations',
                             icon: <Settings size={16} />,
-                            path: '/superadmin-dashboard/installations',
+                            path: '/super-admin-dashboard/installations',
                         },
                         {
                             text: 'Repairs',
                             icon: <Wrench size={16} />,
-                            path: '/superadmin-dashboard/repairs',
+                            path: '/super-admin-dashboard/repairs',
                         },
                     ],
                 },
@@ -129,7 +129,7 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                 {
                     text: 'Users',
                     icon: <Users size={18} />,
-                    path: '/superadmin-dashboard/users',
+                    path: '/super-admin-dashboard/users',
                 },
                 {
                     text: 'Technicians',
@@ -140,17 +140,17 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                         {
                             text: 'All Technicians',
                             icon: <Users size={16} />,
-                            path: '/superadmin-dashboard/all-technicians',
+                            path: '/super-admin-dashboard/all-technicians',
                         },
                         {
                             text: 'Scheduling',
                             icon: <Calendar size={16} />,
-                            path: '/superadmin-dashboard/scheduling',
+                            path: '/super-admin-dashboard/scheduling',
                         },
                         {
                             text: 'Performance',
                             icon: <Activity size={16} />,
-                            path: '/superadmin-dashboard/performance',
+                            path: '/super-admin-dashboard/performance',
                         },
                     ],
                 },
@@ -163,12 +163,12 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                         {
                             text: 'Quotes',
                             icon: <Quote size={16} />,
-                            path: '/superadmin-dashboard/quotes',
+                            path: '/super-admin-dashboard/quotes',
                         },
                         {
                             text: 'Leads',
                             icon: <Target size={16} />,
-                            path: '/superadmin-dashboard/leads',
+                            path: '/super-admin-dashboard/leads',
                         },
                     ],
                 },
@@ -190,12 +190,12 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                         {
                             text: 'Vehicles & Tools',
                             icon: <TollOutlined size={16} />,
-                            path: '/superadmin-dashboard/vehicles-tools',
+                            path: '/super-admin-dashboard/vehicles-tools',
                         },
                         {
                             text: 'Inventory',
                             icon: <Package size={16} />,
-                            path: '/superadmin-dashboard/inventory',
+                            path: '/super-admin-dashboard/inventory',
                         },
                     ],
                 },
@@ -214,29 +214,29 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                                 {
                                     text: 'RME Reports',
                                     icon: <ClipboardCheck size={14} />,
-                                    path: '/superadmin-dashboard/health-department-report-tracking/rme',
+                                    path: '/super-admin-dashboard/health-department-report-tracking/rme',
                                 },
                                 {
                                     text: 'RSS Reports',
                                     icon: <Activity size={14} />,
-                                    path: '/superadmin-dashboard/health-department-report-tracking/rss',
+                                    path: '/super-admin-dashboard/health-department-report-tracking/rss',
                                 },
                                 {
                                     text: 'TOS Reports',
                                     icon: <BarChart3 size={14} />,
-                                    path: '/superadmin-dashboard/health-department-report-tracking/tos',
+                                    path: '/super-admin-dashboard/health-department-report-tracking/tos',
                                 },
                             ],
                         },
                         {
                             text: 'Risk Management',
                             icon: <Shield size={16} />,
-                            path: '/superadmin-dashboard/risk-management',
+                            path: '/super-admin-dashboard/risk-management',
                         },
                         {
                             text: 'Scorecards',
                             icon: <Award size={16} />,
-                            path: '/superadmin-dashboard/scorecards',
+                            path: '/super-admin-dashboard/scorecards',
                         },
                     ],
                 },
@@ -249,17 +249,17 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                         {
                             text: 'Forms',
                             icon: <FileEdit size={16} />,
-                            path: '/superadmin-dashboard/forms',
+                            path: '/super-admin-dashboard/forms',
                         },
                         {
                             text: 'Review Forms',
                             icon: <ClipboardCheck size={16} />,
-                            path: '/superadmin-dashboard/review-forms',
+                            path: '/super-admin-dashboard/review-forms',
                         },
                         {
                             text: 'Approvals',
                             icon: <CheckSquare size={16} />,
-                            path: '/superadmin-dashboard/approvals',
+                            path: '/super-admin-dashboard/approvals',
                         },
                     ],
                 }
@@ -275,22 +275,22 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                 {
                     text: 'Training',
                     icon: <GraduationCap size={18} />,
-                    path: '/superadmin-dashboard/training',
+                    path: '/super-admin-dashboard/training',
                 },
                 {
                     text: 'Tasks',
                     icon: <ClipboardList size={18} />,
-                    path: '/superadmin-dashboard/tasks',
+                    path: '/super-admin-dashboard/tasks',
                 },
                 {
                     text: 'Library',
                     icon: <LibraryBig size={18} />,
-                    path: '/superadmin-dashboard/library',
+                    path: '/super-admin-dashboard/library',
                 },
                 {
                     text: 'Lookup',
                     icon: <Search size={18} />,
-                    path: '/superadmin-dashboard/lookup',
+                    path: '/super-admin-dashboard/lookup',
                 },
             ],
         },

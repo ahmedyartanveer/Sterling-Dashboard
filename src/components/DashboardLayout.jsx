@@ -315,18 +315,52 @@ const generateBreadcrumb = (path) => {
   // Remove leading slash and split by '/'
   const pathParts = path.replace(/^\/+/, '').split('/').filter(Boolean);
 
+  // Common acronyms that should stay uppercase
+  const ACRONYMS = new Set(['rme', 'RSS', 'TOS']);
+
+  // Special case mappings
+  const SPECIAL_CASES = {
+    'rme': 'RME',
+    'rss': 'RSS',
+    'tos': 'TOS',
+    // Add other special cases as needed
+  };
+
   // If we're on a dashboard page (manager-dashboard, superadmin-dashboard, tech-dashboard)
   // Start from there instead of adding "Dashboard"
   const breadcrumbItems = pathParts.map((part, index) => {
     // Decode URL encoded characters
     const decodedPart = decodeURIComponent(part);
 
-    // Convert to display format (replace hyphens with spaces, capitalize)
-    const displayName = decodedPart
-      .replace(/-/g, ' ')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+    let displayName;
+
+    // Check if it's a special case
+    if (SPECIAL_CASES[decodedPart.toLowerCase()]) {
+      displayName = SPECIAL_CASES[decodedPart.toLowerCase()];
+    }
+    // Check if it's an acronym (all caps-like patterns)
+    else if (/^[A-Z]+$/.test(decodedPart) || ACRONYMS.has(decodedPart.toLowerCase())) {
+      // If it's already all uppercase or a known acronym, keep it uppercase
+      displayName = decodedPart.toUpperCase();
+    }
+    // Check for mixed case acronyms (like "rme" should be "RME")
+    else if (ACRONYMS.has(decodedPart.toLowerCase())) {
+      displayName = decodedPart.toUpperCase();
+    }
+    else {
+      // Convert to display format (replace hyphens with spaces, capitalize each word)
+      displayName = decodedPart
+        .replace(/-/g, ' ')
+        .split(' ')
+        .map(word => {
+          // Handle words that might be acronyms even within a hyphenated string
+          if (ACRONYMS.has(word.toLowerCase())) {
+            return word.toUpperCase();
+          }
+          return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
+        .join(' ');
+    }
 
     return {
       name: displayName,

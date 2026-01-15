@@ -44,7 +44,7 @@ export const AppRoutes = () => {
           path="/dashboard"
           element={
             <PrivateRoute>
-              {user?.role === 'superadmin' && <Navigate to="/superadmin-dashboard" replace />}
+              {user?.role === 'superadmin' && <Navigate to="/super-admin-dashboard" replace />}
               {user?.role === 'manager' && <Navigate to="/manager-dashboard" replace />}
               {user?.role === 'tech' && <Navigate to="/tech-dashboard" replace />}
             </PrivateRoute>
@@ -53,7 +53,7 @@ export const AppRoutes = () => {
 
         {/* Super Admin Routes */}
         <Route
-          path="/superadmin-dashboard"
+          path="/super-admin-dashboard"
           element={
             <PrivateRoute requiredRoles={['superadmin']}>
               <SuperAdminLayout />
