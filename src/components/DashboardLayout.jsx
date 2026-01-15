@@ -31,7 +31,6 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import logo from '../public/logo.png';
 import DashboardFooter from './DashboardFooter';
 
-// Import Lucide React icons
 import {
   LogOut,
   User,
@@ -132,7 +131,6 @@ const AppBar = styled(MuiAppBar, {
   }),
 }));
 
-// Permanent drawer for desktop
 const PermanentDrawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' })(
   ({ theme, open }) => ({
     width: drawerWidth,
@@ -168,7 +166,6 @@ const ScrollableBox = styled(Box)({
   scrollbarWidth: 'none',
 });
 
-// Search component with responsive behavior
 const SearchContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
@@ -186,7 +183,6 @@ const SearchContainer = styled(Box)(({ theme }) => ({
     backgroundColor: '#ffffff',
     boxShadow: '0 0 0 2px rgba(49, 130, 206, 0.1)',
   },
-  // Mobile styles
   [theme.breakpoints.down('md')]: {
     position: 'fixed',
     top: 60,
@@ -217,7 +213,6 @@ const SearchInput = styled(InputBase)(({ theme }) => ({
       fontSize: '0.8rem',
     },
   },
-  // Mobile placeholder
   [theme.breakpoints.down('md')]: {
     '& .MuiInputBase-input::placeholder': {
       fontSize: '0.85rem',
@@ -225,7 +220,6 @@ const SearchInput = styled(InputBase)(({ theme }) => ({
   },
 }));
 
-// Mobile search overlay backdrop
 const MobileSearchBackdrop = styled(Box)(({ theme }) => ({
   display: 'none',
   [theme.breakpoints.down('md')]: {
@@ -241,7 +235,6 @@ const MobileSearchBackdrop = styled(Box)(({ theme }) => ({
   },
 }));
 
-// Mobile search toggle button
 const MobileSearchButton = styled(IconButton)(({ theme }) => ({
   display: 'none',
   [theme.breakpoints.down('md')]: {
@@ -259,7 +252,6 @@ const MobileSearchButton = styled(IconButton)(({ theme }) => ({
   },
 }));
 
-// Mobile app bar actions container
 const MobileActionsContainer = styled(Box)(({ theme }) => ({
   [theme.breakpoints.up('md')]: {
     display: 'none',
@@ -271,7 +263,6 @@ const MobileActionsContainer = styled(Box)(({ theme }) => ({
   },
 }));
 
-// Desktop app bar actions container
 const DesktopActionsContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
@@ -284,7 +275,6 @@ const DesktopActionsContainer = styled(Box)(({ theme }) => ({
   },
 }));
 
-// Breadcrumb container with responsive behavior
 const BreadcrumbContainer = styled(Box)(({ theme }) => ({
   flex: 1,
   minWidth: 0,
@@ -293,7 +283,6 @@ const BreadcrumbContainer = styled(Box)(({ theme }) => ({
   },
 }));
 
-// Mobile page title
 const MobilePageTitle = styled(Typography)(({ theme }) => ({
   display: 'none',
   [theme.breakpoints.down('sm')]: {
@@ -310,50 +299,70 @@ const MobilePageTitle = styled(Typography)(({ theme }) => ({
   },
 }));
 
-// Function to generate breadcrumb from path
+const HoverMenu = styled(Box)(({ theme }) => ({
+  position: 'fixed',
+  backgroundColor: '#1a365d',
+  backgroundImage: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
+  borderRadius: '6px',
+  boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+  border: '1px solid rgba(255,255,255,0.15)',
+  zIndex: theme.zIndex.drawer + 10,
+  overflow: 'hidden',
+  animation: 'fadeIn 0.15s ease-out',
+  '@keyframes fadeIn': {
+    from: { opacity: 0, transform: 'translateX(-5px)' },
+    to: { opacity: 1, transform: 'translateX(0)' },
+  },
+}));
+
+const HoverMenuItem = styled(Box)(({ theme }) => ({
+  padding: '8px 12px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  fontSize: '0.8rem',
+  fontWeight: 500,
+  color: alpha('#ffffff', 0.85),
+  transition: 'all 0.2s ease',
+  '&:hover': {
+    backgroundColor: alpha('#ffffff', 0.1),
+    color: '#ffffff',
+  },
+  '&.active': {
+    backgroundColor: alpha('#ffffff', 0.15),
+    color: '#ffffff',
+    borderLeft: '2px solid #63b3ed',
+  },
+}));
+
 const generateBreadcrumb = (path) => {
-  // Remove leading slash and split by '/'
   const pathParts = path.replace(/^\/+/, '').split('/').filter(Boolean);
-
-  // Common acronyms that should stay uppercase
   const ACRONYMS = new Set(['rme', 'RSS', 'TOS']);
-
-  // Special case mappings
   const SPECIAL_CASES = {
     'rme': 'RME',
     'rss': 'RSS',
     'tos': 'TOS',
-    // Add other special cases as needed
   };
 
-  // If we're on a dashboard page (manager-dashboard, superadmin-dashboard, tech-dashboard)
-  // Start from there instead of adding "Dashboard"
   const breadcrumbItems = pathParts.map((part, index) => {
-    // Decode URL encoded characters
     const decodedPart = decodeURIComponent(part);
-
     let displayName;
 
-    // Check if it's a special case
     if (SPECIAL_CASES[decodedPart.toLowerCase()]) {
       displayName = SPECIAL_CASES[decodedPart.toLowerCase()];
     }
-    // Check if it's an acronym (all caps-like patterns)
     else if (/^[A-Z]+$/.test(decodedPart) || ACRONYMS.has(decodedPart.toLowerCase())) {
-      // If it's already all uppercase or a known acronym, keep it uppercase
       displayName = decodedPart.toUpperCase();
     }
-    // Check for mixed case acronyms (like "rme" should be "RME")
     else if (ACRONYMS.has(decodedPart.toLowerCase())) {
       displayName = decodedPart.toUpperCase();
     }
     else {
-      // Convert to display format (replace hyphens with spaces, capitalize each word)
       displayName = decodedPart
         .replace(/-/g, ' ')
         .split(' ')
         .map(word => {
-          // Handle words that might be acronyms even within a hyphenated string
           if (ACRONYMS.has(word.toLowerCase())) {
             return word.toUpperCase();
           }
@@ -369,12 +378,9 @@ const generateBreadcrumb = (path) => {
     };
   });
 
-  // Don't add "Dashboard" if we're already on a dashboard page
-  // Start from the dashboard page itself
   return breadcrumbItems;
 };
 
-// Function to get page title from path
 const getPageTitle = (path) => {
   const pathParts = path.replace(/^\/+/, '').split('/').filter(Boolean);
 
@@ -392,7 +398,6 @@ const getPageTitle = (path) => {
     .join(' ');
 };
 
-// Profile Dialog Component
 const ProfileDialog = ({ open, onClose, user, userRole }) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -400,11 +405,9 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
 
   if (!user) return null;
 
-  // Function to get the dashboard base path
   const getDashboardBasePath = () => {
     const currentPath = location.pathname;
 
-    // Check which dashboard we're on
     if (currentPath.startsWith('/superadmin-dashboard')) {
       return '/superadmin-dashboard';
     } else if (currentPath.startsWith('/manager-dashboard')) {
@@ -413,7 +416,6 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
       return '/tech-dashboard';
     }
 
-    // Default fallback based on role
     switch (userRole?.toUpperCase()) {
       case 'SUPERADMIN':
         return '/superadmin-dashboard';
@@ -429,13 +431,13 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
   const getRoleColor = (role) => {
     switch (role?.toUpperCase()) {
       case 'SUPERADMIN':
-        return '#dc2626'; // red-600
+        return '#dc2626';
       case 'MANAGER':
-        return '#059669'; // green-600
+        return '#059669';
       case 'TECH':
-        return '#2563eb'; // blue-600
+        return '#2563eb';
       default:
-        return '#6b7280'; // gray-500
+        return '#6b7280';
     }
   };
 
@@ -545,7 +547,6 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
 
       <DialogContent sx={{ pt: 3, pb: 2 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-          {/* Profile Avatar */}
           <Box sx={{ position: 'relative', mb: 0 }}>
             <Avatar
               sx={{
@@ -568,7 +569,6 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
             </Avatar>
           </Box>
 
-          {/* User Name */}
           <Typography variant="h5" sx={{
             color: '#1a202c',
             fontSize: '1.25rem',
@@ -582,7 +582,6 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
             {user?.name || 'Jenny Wilson'}
           </Typography>
 
-          {/* Role Badge */}
           <Chip
             icon={getRoleIcon(userRole)}
             label={getRoleLabel(userRole)}
@@ -602,7 +601,6 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
           />
         </Box>
 
-        {/* Profile Details */}
         <Box sx={{
           backgroundColor: '#f8fafc',
           borderRadius: '8px',
@@ -626,7 +624,6 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
           </Typography>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {/* Email */}
             <Box>
               <Typography variant="caption" sx={{
                 color: '#718096',
@@ -650,7 +647,6 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
               </Box>
             </Box>
 
-            {/* Role */}
             <Box>
               <Typography variant="caption" sx={{
                 color: '#718096',
@@ -673,7 +669,6 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
               </Box>
             </Box>
 
-            {/* Member Since */}
             <Box>
               <Typography variant="caption" sx={{
                 color: '#718096',
@@ -732,14 +727,70 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
   );
 };
 
-// Recursive component to render nested menu items
-const NestedMenuItem = ({ item, level = 0, isDrawerOpen, getActiveStyles, handleNavigation, isMobile }) => {
+const NestedMenuItem = ({ item, level = 0, isDrawerOpen, getActiveStyles, handleNavigation, isMobile, location }) => {
   const isExpandable = item.isExpandable;
   const isExpanded = item.expanded;
+  const [hoverMenuAnchor, setHoverMenuAnchor] = React.useState(null);
+  const [hoverTimeout, setHoverTimeout] = React.useState(null);
+
+  const isItemActive = (path) => {
+    const currentPath = location.pathname;
+    if (currentPath === path) return true;
+    if (path !== '/superadmin-dashboard' && path !== '/manager-dashboard' && path !== '/tech-dashboard' && currentPath.startsWith(path + '/')) {
+      return true;
+    }
+    if (path === '/manager-dashboard' && currentPath === '/manager-dashboard') {
+      return true;
+    }
+    if (path !== '/superadmin-dashboard' && path !== '/manager-dashboard' && path !== '/tech-dashboard' && currentPath === path) {
+      return true;
+    }
+    return false;
+  };
+
+  const isActive = isItemActive(item.path);
+
+  const handleMouseEnter = (event) => {
+    if (!isDrawerOpen && !isMobile && (item.isExpandable || item.subItems?.length > 0)) {
+      clearTimeout(hoverTimeout);
+      setHoverMenuAnchor(event.currentTarget);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (!isDrawerOpen && !isMobile) {
+      const timeout = setTimeout(() => {
+        setHoverMenuAnchor(null);
+      }, 200);
+      setHoverTimeout(timeout);
+    }
+  };
+
+  const handleHoverMenuMouseEnter = () => {
+    clearTimeout(hoverTimeout);
+  };
+
+  const handleHoverMenuMouseLeave = () => {
+    const timeout = setTimeout(() => {
+      setHoverMenuAnchor(null);
+    }, 200);
+    setHoverTimeout(timeout);
+  };
+
+  const handleItemClick = () => {
+    if (item.onClick) {
+      item.onClick();
+    } else if (item.path) {
+      handleNavigation(item.path);
+    }
+    setHoverMenuAnchor(null);
+  };
 
   const mainButton = (
     <ListItemButton
-      onClick={item.onClick || (() => handleNavigation(item.path))}
+      onClick={handleItemClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       sx={[
         getActiveStyles(item.path),
         {
@@ -818,7 +869,6 @@ const NestedMenuItem = ({ item, level = 0, isDrawerOpen, getActiveStyles, handle
     </ListItemButton>
   );
 
-  // Wrap in tooltip for collapsed state
   const wrappedButton = isDrawerOpen || !isMobile ? (
     mainButton
   ) : (
@@ -846,18 +896,73 @@ const NestedMenuItem = ({ item, level = 0, isDrawerOpen, getActiveStyles, handle
     </Tooltip>
   );
 
+  const renderHoverMenu = () => {
+    if (!hoverMenuAnchor || isDrawerOpen || isMobile) return null;
+
+    const rect = hoverMenuAnchor.getBoundingClientRect();
+    const hasSubItems = item.subItems && item.subItems.length > 0;
+    
+    return (
+      <HoverMenu
+        onMouseEnter={handleHoverMenuMouseEnter}
+        onMouseLeave={handleHoverMenuMouseLeave}
+        sx={{
+          left: rect.right + 4,
+          top: rect.top,
+          minWidth: 180,
+          maxWidth: 250,
+        }}
+      >
+        <HoverMenuItem
+          onClick={handleItemClick}
+          className={isActive ? 'active' : ''}
+          sx={{
+            fontWeight: 600,
+            borderBottom: hasSubItems ? '1px solid rgba(255,255,255,0.15)' : 'none',
+          }}
+        >
+          {React.cloneElement(item.icon, { size: 16, color: isActive ? '#ffffff' : alpha('#ffffff', 0.85) })}
+          <span>{item.text}</span>
+        </HoverMenuItem>
+        
+        {hasSubItems && item.subItems.map((subItem, index) => {
+          const isSubItemActive = isItemActive(subItem.path);
+          return (
+            <HoverMenuItem
+              key={index}
+              onClick={() => {
+                if (subItem.path) {
+                  handleNavigation(subItem.path);
+                }
+                setHoverMenuAnchor(null);
+              }}
+              className={isSubItemActive ? 'active' : ''}
+              sx={{
+                pl: 3,
+              }}
+            >
+              {React.cloneElement(subItem.icon, { size: 14, color: isSubItemActive ? '#ffffff' : alpha('#ffffff', 0.85) })}
+              <span>{subItem.text}</span>
+            </HoverMenuItem>
+          );
+        })}
+      </HoverMenu>
+    );
+  };
+
   return (
     <React.Fragment>
       <ListItem
         disablePadding
         sx={{
           display: 'block',
+          position: 'relative',
         }}
       >
         {wrappedButton}
+        {renderHoverMenu()}
       </ListItem>
 
-      {/* Recursively render nested sub-items */}
       {isExpandable && isExpanded && item.subItems && isDrawerOpen && (
         <List sx={{
           py: 0,
@@ -873,6 +978,7 @@ const NestedMenuItem = ({ item, level = 0, isDrawerOpen, getActiveStyles, handle
               getActiveStyles={getActiveStyles}
               handleNavigation={handleNavigation}
               isMobile={isMobile}
+              location={location}
             />
           ))}
         </List>
@@ -893,7 +999,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
 
   const [open, setOpen] = React.useState(!isMobile);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
-  const [drawerMenuAnchorEl, setDrawerMenuAnchorEl] = React.useState(null);
   const [profileDialogOpen, setProfileDialogOpen] = React.useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
 
@@ -906,11 +1011,9 @@ export default function DashboardLayout({ children, title, menuItems }) {
   const getInitials = (name) =>
     name?.split(' ').map((n) => n[0]).join('').toUpperCase() || 'U';
 
-  // Generate breadcrumb from current path
   const breadcrumbItems = generateBreadcrumb(location.pathname);
   const pageTitle = getPageTitle(location.pathname);
 
-  // Get user role from localStorage or user object
   const getUserRole = () => {
     try {
       const userData = localStorage.getItem('user');
@@ -926,24 +1029,19 @@ export default function DashboardLayout({ children, title, menuItems }) {
 
   const userRole = getUserRole();
 
-  // Enhanced route matching logic
   const isRouteActive = (path) => {
     const currentPath = location.pathname;
 
-    // Exact match
     if (currentPath === path) return true;
 
-    // For nested routes
     if (path !== '/superadmin-dashboard' && path !== '/manager-dashboard' && path !== '/tech-dashboard' && currentPath.startsWith(path + '/')) {
       return true;
     }
 
-    // Special handling for dashboard root
     if (path === '/manager-dashboard' && currentPath === '/manager-dashboard') {
       return true;
     }
 
-    // For paths that are direct parent of current path
     if (path !== '/superadmin-dashboard' && path !== '/manager-dashboard' && path !== '/tech-dashboard' && currentPath === path) {
       return true;
     }
@@ -1001,29 +1099,13 @@ export default function DashboardLayout({ children, title, menuItems }) {
     setMenuAnchorEl(null);
   };
 
-  const handleDrawerMenuOpen = (event) => {
-    setDrawerMenuAnchorEl(event.currentTarget);
-  };
-
-  const handleDrawerMenuClose = () => {
-    setDrawerMenuAnchorEl(null);
-  };
-
   const handleProfileClick = () => {
     setProfileDialogOpen(true);
     handleMenuClose();
-    handleDrawerMenuClose();
-  };
-
-  const handleSettings = () => {
-    navigate('/settings');
-    handleMenuClose();
-    handleDrawerMenuClose();
   };
 
   const handleLogout = () => {
     handleMenuClose();
-    handleDrawerMenuClose();
     logout();
     navigate('/login');
   };
@@ -1037,7 +1119,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
     }
   };
 
-  // Handle breadcrumb navigation
   const handleBreadcrumbClick = (path) => {
     if (path) {
       navigate(path);
@@ -1119,7 +1200,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
       <ScrollableBox sx={{ py: 0.5 }}>
         {menuItems?.map((section, sectionIndex) => (
           <React.Fragment key={sectionIndex}>
-            {/* Section Header - Only show when drawer is open */}
             {open && section.sectionName && (
               <Box sx={{
                 px: 2.5,
@@ -1142,7 +1222,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
               </Box>
             )}
 
-            {/* Section Items */}
             <List sx={{ py: 0.25 }}>
               {section.items.map((item, index) => (
                 <NestedMenuItem
@@ -1153,188 +1232,13 @@ export default function DashboardLayout({ children, title, menuItems }) {
                   getActiveStyles={getActiveStyles}
                   handleNavigation={handleNavigation}
                   isMobile={isMobile}
+                  location={location}
                 />
               ))}
             </List>
           </React.Fragment>
         ))}
       </ScrollableBox>
-
-      {/* User Profile Section at bottom - Now clickable */}
-      {/* <Box sx={{
-        p: open ? 1.25 : 0.75,
-        flexShrink: 0,
-      }}>
-        {open ? (
-          // Expanded view with user info - Now clickable
-          <Box
-            onClick={handleProfileClick}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 1,
-              cursor: 'pointer',
-              p: 1.2,
-              borderRadius: '8px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              border: `1px solid ${alpha('#ffffff', 0.3)}`,
-              '&:hover': {
-                backgroundColor: alpha('#ffffff', 0.1),
-              },
-            }}
-          >
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.25,
-              flex: 1,
-              minWidth: 0,
-            }}>
-              <Avatar
-                sx={{
-                  width: 36,
-                  height: 36,
-                  bgcolor: '#63b3ed',
-                  color: '#ffffff',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                }}
-              >
-                {getInitials(user?.name)}
-              </Avatar>
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: '#ffffff',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    lineHeight: 1.2,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {user?.name || 'Jenny Wilson'}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: alpha('#ffffff', 0.7),
-                    fontSize: '0.7rem',
-                    lineHeight: 1.2,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    display: 'block',
-                  }}
-                >
-                  {user?.email || 'jennywilson@gmail.com'}
-                </Typography>
-              </Box>
-            </Box>
-            <IconButton
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDrawerMenuOpen(e);
-              }}
-              sx={{
-                color: alpha('#ffffff', 0.7),
-                width: 28,
-                height: 28,
-                '&:hover': {
-                  backgroundColor: alpha('#ffffff', 0.15),
-                  color: '#ffffff',
-                },
-              }}
-            >
-              <MoreVertical size={18} />
-            </IconButton>
-            <Menu
-              anchorEl={drawerMenuAnchorEl}
-              open={Boolean(drawerMenuAnchorEl)}
-              onClose={handleDrawerMenuClose}
-              PaperProps={{
-                sx: {
-                  mt: 0.5,
-                  minWidth: 150,
-                  backgroundColor: '#2d3748',
-                  backgroundImage: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
-                  color: '#ffffff',
-                  border: `1px solid ${alpha('#ffffff', 0.1)}`,
-                  '& .MuiMenuItem-root': {
-                    fontSize: '0.8rem',
-                    py: 0.5,
-                    px: 1.25,
-                    color: alpha('#ffffff', 0.9),
-                    '&:hover': {
-                      backgroundColor: alpha('#ffffff', 0.15),
-                      color: '#ffffff',
-                    },
-                    '& .MuiListItemIcon-root': {
-                      color: 'inherit',
-                      minWidth: 32,
-                    },
-                  },
-                },
-              }}
-              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-            >
-              <MenuItem onClick={handleProfileClick}>
-                <ListItemIcon>
-                  <User size={16} />
-                </ListItemIcon>
-                Profile
-              </MenuItem>
-              <Divider sx={{
-                my: 0.5,
-                borderColor: alpha('#ffffff', 0.1),
-                backgroundColor: alpha('#ffffff', 0.1)
-              }} />
-              <MenuItem onClick={handleLogout}>
-                <ListItemIcon>
-                  <LogOut size={16} />
-                </ListItemIcon>
-                Logout
-              </MenuItem>
-            </Menu>
-          </Box>
-        ) : (
-          // Collapsed view - just avatar (clickable)
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <IconButton
-              onClick={handleProfileClick}
-              sx={{
-                color: '#ffffff',
-                width: 36,
-                height: 36,
-                '&:hover': {
-                  backgroundColor: alpha('#ffffff', 0.1),
-                },
-              }}
-            >
-              <Avatar
-                sx={{
-                  width: 28,
-                  height: 28,
-                  bgcolor: '#63b3ed',
-                  color: '#ffffff',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                }}
-              >
-                {getInitials(user?.name)}
-              </Avatar>
-            </IconButton>
-          </Box>
-        )}
-      </Box> */}
     </Box>
   );
 
@@ -1342,12 +1246,10 @@ export default function DashboardLayout({ children, title, menuItems }) {
     <Box sx={{ display: 'flex', minHeight: '100vh', overflow: 'hidden' }}>
       <CssBaseline />
 
-      {/* Mobile search backdrop */}
       {mobileSearchOpen && (
         <MobileSearchBackdrop onClick={handleMobileSearchClose} />
       )}
 
-      {/* AppBar */}
       <AppBar
         position="fixed"
         open={open && !isMobile}
@@ -1368,7 +1270,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
           alignItems: 'center',
           gap: 1.5,
         }}>
-          {/* Left section with menu toggle and breadcrumb */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             {!isMobile ? (
               <IconButton
@@ -1414,12 +1315,10 @@ export default function DashboardLayout({ children, title, menuItems }) {
               </IconButton>
             )}
 
-            {/* Mobile page title */}
             <MobilePageTitle>
               {pageTitle}
             </MobilePageTitle>
 
-            {/* Desktop breadcrumb */}
             <BreadcrumbContainer>
               <Typography
                 variant="h6"
@@ -1484,9 +1383,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
             </BreadcrumbContainer>
           </Box>
 
-          {/* Desktop Actions */}
           <DesktopActionsContainer>
-            {/* Search Container - only visible on desktop */}
             <SearchContainer sx={{ width: '280px' }}>
               <Search size={16} color="#a0aec0" />
               <SearchInput
@@ -1495,7 +1392,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
               />
             </SearchContainer>
 
-            {/* Notification icon */}
             <IconButton
               sx={{
                 color: '#718096',
@@ -1525,7 +1421,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
               </Badge>
             </IconButton>
 
-            {/* User avatar with menu */}
             <IconButton
               onClick={handleMenuOpen}
               sx={{
@@ -1640,14 +1535,11 @@ export default function DashboardLayout({ children, title, menuItems }) {
             </Menu>
           </DesktopActionsContainer>
 
-          {/* Mobile Actions */}
           <MobileActionsContainer>
-            {/* Mobile search toggle */}
             <MobileSearchButton onClick={toggleMobileSearch}>
               <Search size={16} />
             </MobileSearchButton>
 
-            {/* Notification icon */}
             <IconButton
               sx={{
                 color: '#718096',
@@ -1677,7 +1569,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
               </Badge>
             </IconButton>
 
-            {/* User avatar with menu */}
             <IconButton
               onClick={handleMenuOpen}
               sx={{
@@ -1794,7 +1685,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
         </Toolbar>
       </AppBar>
 
-      {/* Mobile Search Overlay */}
       {mobileSearchOpen && (
         <Box sx={{
           position: 'fixed',
@@ -1851,7 +1741,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
         </Box>
       )}
 
-      {/* Drawer */}
       {isMobile ? (
         <MuiDrawer
           variant="temporary"
@@ -1883,7 +1772,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
         </PermanentDrawer>
       )}
 
-      {/* Main content */}
       <Box
         component="main"
         sx={{
@@ -1894,7 +1782,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
           backgroundColor: '#f7fafc',
           width: '100%',
           overflow: 'hidden',
-          pt: mobileSearchOpen ? 8 : 0, // Adjust for mobile search bar
+          pt: mobileSearchOpen ? 8 : 0,
         }}
       >
         <DrawerHeader />
@@ -1921,7 +1809,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
               overflow: 'hidden',
             }}
           >
-            {/* Scrollable content area with minimal scrollbar */}
             <Box
               sx={{
                 flex: 1,
@@ -1943,7 +1830,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
                     background: '#a0aec0',
                   },
                 },
-                // For Firefox
                 scrollbarWidth: 'thin',
                 scrollbarColor: '#cbd5e0 #f1f5f9',
               }}
@@ -1953,7 +1839,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
           </Box>
         </Box>
 
-        {/* Footer */}
         <Box sx={{
           borderTop: '1px solid rgba(0,0,0,0.04)',
           backgroundColor: '#ffffff',
@@ -1964,7 +1849,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
         </Box>
       </Box>
 
-      {/* Profile Dialog */}
       <ProfileDialog
         open={profileDialogOpen}
         onClose={handleProfileDialogClose}
