@@ -220,7 +220,7 @@ def delete_work_order(request, id):
             timer_expired=work_order.timer_expired,
             time_remaining=work_order.time_remaining,
             metadata=work_order.metadata,
-            deleted_by=request.user.get_full_name() or request.user.username,
+            deleted_by=request.user.get_full_name() or request.user.name,
             deleted_by_email=request.user.email,
             deleted_from='Dashboard',
             is_permanently_deleted=False,
@@ -305,7 +305,7 @@ def bulk_delete_work_orders(request):
                 timer_expired=work_order.timer_expired,
                 time_remaining=work_order.time_remaining,
                 metadata=work_order.metadata,
-                deleted_by=request.user.get_full_name() or request.user.username,
+                deleted_by=request.user.get_full_name() or request.user.name,
                 deleted_by_email=request.user.email,
                 deleted_from='Dashboard',
                 is_permanently_deleted=False,
@@ -355,7 +355,7 @@ def update_work_order_call_status(request, id):
             }, status=status.HTTP_404_NOT_FOUND)
         
         data = serializer.validated_data
-        called_by_name = request.user.get_full_name() or request.user.username or data.get('called_by', 'Unknown Manager')
+        called_by_name = request.user.get_full_name() or request.user.name or data.get('called_by', 'Unknown Manager')
         called_by_email = request.user.email or data.get('called_by_email', 'unknown@email.com')
         
         work_order.locates_called = data['locates_called']
@@ -512,7 +512,7 @@ def complete_work_order_manually(request, id):
         work_order.metadata.update({
             'completed_manually': True,
             'completed_at': timezone.now().isoformat(),
-            'completed_by': request.user.get_full_name() or request.user.username,
+            'completed_by': request.user.get_full_name() or request.user.name,
             'completed_by_email': request.user.email
         })
         
@@ -666,7 +666,7 @@ def restore_work_order(request, dashboard_id, deleted_order_id):
                 **deleted_order.metadata,
                 'restored': True,
                 'restored_at': timezone.now().isoformat(),
-                'restored_by': request.user.get_full_name() or request.user.username,
+                'restored_by': request.user.get_full_name() or request.user.name,
                 'restored_by_email': request.user.email
             }
         )
