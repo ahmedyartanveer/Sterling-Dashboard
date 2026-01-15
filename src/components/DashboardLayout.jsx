@@ -1843,7 +1843,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
           borderTop: '1px solid rgba(0,0,0,0.04)',
           backgroundColor: '#ffffff',
           py: 1,
-          px: { xs: 1.25, sm: 2 },
+          px: { xs: 1.25, sm: 2 }
         }}>
           <DashboardFooter />
         </Box>
