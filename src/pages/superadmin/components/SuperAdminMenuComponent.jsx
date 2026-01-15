@@ -93,7 +93,7 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                             path: '/superadmin-dashboard/logistics-map',
                         },
                         {
-                            text: 'Lcates',
+                            text: 'Locates',
                             icon: <MapPin size={16} />,
                             path: '/superadmin-dashboard/locates',
                         },

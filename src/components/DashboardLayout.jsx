@@ -1127,7 +1127,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
       </ScrollableBox>
 
       {/* User Profile Section at bottom - Now clickable */}
-      <Box sx={{
+      {/* <Box sx={{
         p: open ? 1.25 : 0.75,
         flexShrink: 0,
       }}>
@@ -1300,7 +1300,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
             </IconButton>
           </Box>
         )}
-      </Box>
+      </Box> */}
     </Box>
   );
 
