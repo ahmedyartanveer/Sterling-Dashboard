@@ -2726,7 +2726,7 @@ const LocateTable = ({
                                                                 display: 'block'
                                                             }}
                                                         >
-                                                            Work order will commence: 
+                                                            Work order was created: 
                                                             <Typography
                                                                 variant="caption"
                                                                 sx={{
