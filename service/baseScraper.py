@@ -1,8 +1,9 @@
 import os
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
-
-
+from service.inseartLocates import InseartLocatesService
+from datetime import datetime
+import pytz
 # Load environment variables
 load_dotenv()
 RULES_FILE_PATH = os.getenv("RULES_FILE_PATH", "service/locatesRules.json")
@@ -50,3 +51,37 @@ class BaseScraper:
         # Wait for navigation and click submit simultaneously
         async with self.page.expect_navigation(wait_until='domcontentloaded'):
             await self.page.click(self.rules.get('login_button_xpath'))
+
+    def inseat_locates(self, locates_data):
+        """Inserts locates data using InseartLocatesService"""
+        try:
+            inserter = InseartLocatesService()
+            success = inserter.insert_locates(locates_data)
+            return success
+        except Exception as e:
+            print(f"DB Insertion Error: {e}")
+            return False
+    
+    def inseat_workorder_today(self, todays):
+        """Inserts locates data using InseartLocatesService"""
+        try:
+            inserter = InseartLocatesService()
+            for today in todays:
+                timezone = pytz.timezone('Etc/GMT+8')
+                gmt_minus_8_time = datetime.now(timezone)
+                today['elapsed_time'] = gmt_minus_8_time.isoformat()
+                scheduled_date = today.get('scheduled_date', '')
+                if scheduled_date:
+                    date_obj = datetime.strptime(scheduled_date, '%m/%d/%Y')
+                    today['scheduled_date'] = date_obj.replace(hour=0, minute=0, second=0).isoformat()
+                else:
+                    today['scheduled_date'] = None
+                print(today)
+                if inserter.insert_work_order_today(today):
+                    print("Work order inserted successfully.")
+                else:
+                    print("Failed to insert work order.")
+            return True
+        except Exception as e:
+            print(f"DB Insertion Error: {e}")
+            return False

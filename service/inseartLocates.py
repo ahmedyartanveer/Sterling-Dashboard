@@ -16,6 +16,7 @@ class InseartLocatesService:
         # URL setup
         self.base_url = os.getenv('API_URL')
         self.api_url = self.base_url + "sync-dashboard"
+        self.work_orders_today_url = self.base_url + "work-orders-today/"
         self.login_url = self.base_url + "auth/login"
         
         # Utilities
@@ -103,6 +104,56 @@ class InseartLocatesService:
         except requests.RequestException as e:
             print(f"❌ Connection error during insert: {e}")
             return False
+    
+    def insert_work_order_today(self, work_order_today: dict):
+        """
+        Sends locates data to the API. 
+        If token is missing/expired, it attempts to login again.
+        """
+        # 1. Check if we have a token, if not, try to login
+        if not self.token:
+            print("Token missing, trying to login again...")
+            self.token = self.login()
+            if not self.token:
+                print("Aborting: Could not obtain token.")
+                return False
+        
+        # 2. Add Authorization header
+        self.headers_data['Authorization'] = f'Bearer {self.token}'
+        print("Sending Work Order Today data...")
+        try:
+            response = requests.post(self.work_orders_today_url, json=work_order_today, headers=self.headers_data)
+            
+            # Check specifically for success (200 or 201)
+            if response.status_code in [200, 201]:
+                print(f"✅ Work Order Today inserted successfully! (Status: {response.status_code})")
+                return True
+            
+            # Handle unauthorized (401) - Maybe token expired?
+            elif response.status_code == 401:
+                print("⚠️ Token expired. Re-authenticating...")
+                self.token = self.login()
+                if self.token:
+                    # Retry the request once with new token
+                    self.headers_data['Authorization'] = f'Bearer {self.token}'
+                    retry_response = requests.post(self.work_orders_today_url, json=work_order_today, headers=self.headers_data)
+                    if retry_response.status_code in [200, 201]:
+                        print("✅ Work Order Today inserted successfully after retry.")
+                        return True
+                print(f"❌ Failed after retry. Status: {response.status_code}")
+                print("Response:", response.text)
+                return False
+                
+            else:
+                print(f"❌ Failed to insert Work Order Today. Status: {response.status_code}")
+                print("Response:", response.text)
+                return False
+
+        except requests.RequestException as e:
+            print(f"❌ Connection error during insert: {e}")
+            return False
+    
+        
 
 # --- Example Usage ---
 if __name__ == "__main__":

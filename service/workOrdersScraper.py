@@ -1,6 +1,6 @@
 import sys
 import asyncio
-from baseScraper import BaseScraper
+from service.baseScraper import BaseScraper
 from time import sleep
 import copy
 
@@ -107,7 +107,7 @@ class WorkOrdersScraper(BaseScraper):
         """Gets full addresses for all work orders"""
         rows = []
         base_wo_xpath_config = self.rules.get('open_work_order_xpath', [])
-
+        # all_work_orders = all_work_orders[:2]
         while all_work_orders:
             work_order = all_work_orders.pop(0)
             try:
@@ -128,6 +128,7 @@ class WorkOrdersScraper(BaseScraper):
                             address = await self.scrape_address(page=new_page) 
                             if address:
                                 work_order['full_address'] = address
+                                print(work_order)
                                 rows.append(work_order)
                             else:
                                 raise Exception("Address not found")
@@ -168,7 +169,7 @@ class WorkOrdersScraper(BaseScraper):
             
             try:
                 wait_xpath = self.rules.get("wait_xpath") 
-                await self.page.wait_for_selector(wait_xpath, state='visible', timeout=60000)
+                await self.page.wait_for_selector(wait_xpath, state='visible', timeout=600000)
             except Exception as e:
                 print(f"Error waiting for status selector: {e}")
                 return None
@@ -193,28 +194,28 @@ class WorkOrdersScraper(BaseScraper):
     
 
 # --- Execution ---
-async def main():
-    scraper = WorkOrdersScraper()
-    data = await scraper.run()
-    print(data)
+# async def main():
+#     scraper = WorkOrdersScraper()
+#     data = await scraper.run()
+#     print(data)
    
     
-def start_scraping():
-    print("Scraping started...")
+# def start_scraping():
+#     print("Scraping started...")
 
-    if sys.platform.startswith("win"):
+#     if sys.platform.startswith("win"):
 
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-        print("OS: Windows detected. Policy set to Proactor.")
-    else:
-        print(f"OS: {sys.platform} detected. Using default event loop.")
+#         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+#         print("OS: Windows detected. Policy set to Proactor.")
+#     else:
+#         print(f"OS: {sys.platform} detected. Using default event loop.")
         
-    try:
-        asyncio.run(main())
-    except Exception as e:
-        print(f"Critical Loop Error: {e}")
+#     try:
+#         asyncio.run(main())
+#     except Exception as e:
+#         print(f"Critical Loop Error: {e}")
         
-    print("Scraping finished.")
+#     print("Scraping finished.")
 
-if __name__ == "__main__":
-    start_scraping()
+# if __name__ == "__main__":
+#     start_scraping()

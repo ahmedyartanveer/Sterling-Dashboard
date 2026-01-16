@@ -46,7 +46,7 @@
       },
       {
         "action": "click",
-        "xpath": "//li[@id='vs2__option-3']"
+        "xpath": "//li[@id='vs2__option-2']"
       },
       {
         "action": "click",

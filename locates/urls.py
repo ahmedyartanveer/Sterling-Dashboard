@@ -1,9 +1,17 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
+from .views import WorkOrderTodayViewSet
+from rest_framework.routers import DefaultRouter
 
 app_name = 'locates'
 
+router = DefaultRouter()
+router.register(r'work-orders-today', WorkOrderTodayViewSet)
+
 urlpatterns = [
+    
+    path('', include(router.urls)),
+    
     # Sync routes (no authentication required)
     path('sync-dashboard', views.sync_dashboard, name='sync_dashboard'),
     path('sync-assigned-dashboard/', views.sync_assigned_dashboard, name='sync_assigned_dashboard'),

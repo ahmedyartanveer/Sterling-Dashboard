@@ -6,17 +6,41 @@ from django.utils import timezone
 from datetime import timedelta, datetime
 from django.db.models import Q
 from django.core.paginator import Paginator
+from rest_framework import viewsets
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
 
-from .models import DashboardData, WorkOrder, DeletedWorkOrder
+from .models import DashboardData, WorkOrder, DeletedWorkOrder, WorkOrderToday
 from .serializers import (
     DashboardDataSerializer, WorkOrderSerializer, DeletedWorkOrderSerializer,
-    DashboardWithHistorySerializer, CallStatusUpdateSerializer, BulkDeleteSerializer, SyncInputSerializer
+    DashboardWithHistorySerializer, CallStatusUpdateSerializer, BulkDeleteSerializer, WorkOrderTodaySerializer
 )
 
 
-# Import your scraper services here
-# from .services import scrape_locates_dispatch_board, assigned_locates_dispatch_board
 
+
+class WorkOrderTodayViewSet(viewsets.ModelViewSet):
+    """
+    A ViewSet for viewing and editing WorkOrderToday instances.
+    Provides automatic list, create, retrieve, update, and destroy actions.
+    """
+    queryset = WorkOrderToday.objects.all()
+    serializer_class = WorkOrderTodaySerializer
+
+    # Setup for filtering, searching, and ordering
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+
+    # This allows filtering by ALL fields in the model exactly as requested
+    # Example: /api/work-orders/?status=Pending&technician=Alex
+    filterset_fields = '__all__'
+
+    # Optional: If you want search capability (partial match) on specific text fields
+    # Example: /api/work-orders/?search=dhaka
+    search_fields = ['wo_number', 'full_address', 'technician', 'notes']
+
+    # Default ordering by scheduled date (newest first)
+    ordering_fields = '__all__'
+    ordering = ['-scheduled_date']
 
 @api_view(['POST'])
 def sync_dashboard(request):

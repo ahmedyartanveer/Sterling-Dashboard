@@ -3,6 +3,7 @@ import asyncio
 from datetime import datetime
 from service.inseartLocates import InseartLocatesService
 from service.baseScraper import BaseScraper
+from service.workOrdersScraper import WorkOrdersScraper
 
 
 class FieldEdgeScraper(BaseScraper):
@@ -166,15 +167,7 @@ class FieldEdgeScraper(BaseScraper):
             if self.playwright:
                 await self.playwright.stop()
     
-    def inseat_locates(self, locates_data):
-        """Inserts locates data using InseartLocatesService"""
-        try:
-            inserter = InseartLocatesService()
-            success = inserter.insert_locates(locates_data)
-            return success
-        except Exception as e:
-            print(f"DB Insertion Error: {e}")
-            return False
+
 
 # --- Execution ---
 async def main():
@@ -187,6 +180,12 @@ async def main():
             print("Failed to insert data.")
     else:
         print("No data scraped or error occurred.")
+    del scraper
+    scraper = WorkOrdersScraper()
+    data_today = await scraper.run()
+    if data_today:
+        scraper.inseat_workorder_today(data_today)
+             
     
     
 def start_scraping():
