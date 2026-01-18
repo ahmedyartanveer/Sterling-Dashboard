@@ -29,18 +29,66 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
 
     # Setup for filtering, searching, and ordering
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-
-    # This allows filtering by ALL fields in the model exactly as requested
-    # Example: /api/work-orders/?status=Pending&technician=Alex
     filterset_fields = '__all__'
-
-    # Optional: If you want search capability (partial match) on specific text fields
-    # Example: /api/work-orders/?search=dhaka
     search_fields = ['wo_number', 'full_address', 'technician', 'notes']
-
-    # Default ordering by scheduled date (newest first)
     ordering_fields = '__all__'
     ordering = ['-scheduled_date']
+
+    def create(self, request, *args, **kwargs):
+        """
+        Custom create method to filter out duplicates before saving.
+        Supports both single object and list of objects (Bulk Create).
+        """
+        incoming_data = request.data
+
+        # 1. Check if data is a list (Bulk Create)
+        if isinstance(incoming_data, list):
+            unique_data = []
+            seen = set()
+
+            for w in incoming_data:
+                # Get the work order number (Assuming the field name is 'wo_number')
+                # If your input JSON uses 'workOrderNumber', change this line accordingly.
+                wo_number = w.get('wo_number') 
+
+                # Skip if no wo_number is provided
+                if not wo_number:
+                    continue
+
+                # Skip if already seen in the current batch (Current request check)
+                if wo_number in seen:
+                    continue
+
+                # Skip if already exists in the database (Database check)
+                if WorkOrderToday.objects.filter(wo_number=wo_number).exists():
+                    continue
+
+                seen.add(wo_number)
+                unique_data.append(w)
+
+            # If there is valid data left after filtering
+            if unique_data:
+                serializer = self.get_serializer(data=unique_data, many=True)
+                serializer.is_valid(raise_exception=True)
+                self.perform_create(serializer)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            else:
+                return Response(
+                    {"message": "All items were duplicates or invalid."},
+                    status=status.HTTP_200_OK
+                )
+
+        # 2. If data is a single object (Normal Create)
+        else:
+            # Check for duplicates for single post as well
+            wo_number = incoming_data.get('wo_number')
+            if wo_number and WorkOrderToday.objects.filter(wo_number=wo_number).exists():
+                return Response(
+                    {"message": f"WorkOrder {wo_number} already exists."},
+                    status=status.HTTP_409_CONFLICT
+                )
+            
+            return super().create(request, *args, **kwargs)
 
 @api_view(['POST'])
 def sync_dashboard(request):
