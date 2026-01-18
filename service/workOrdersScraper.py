@@ -215,7 +215,8 @@ class WorkOrdersScraper(BaseScraper):
 #     except Exception as e:
 #         print(f"Critical Loop Error: {e}")
         
-#     print("Scraping finished.")
+    # print("Scraping finished.")
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
+    print("Scraping finished.")
 #     start_scraping()
