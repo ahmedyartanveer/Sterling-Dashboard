@@ -9,6 +9,7 @@ from django.core.paginator import Paginator
 from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
+from django_filters import FilterSet
 
 from .models import DashboardData, WorkOrder, DeletedWorkOrder, WorkOrderToday
 from .serializers import (
@@ -17,7 +18,48 @@ from .serializers import (
 )
 
 
+class WorkOrderTodayFilter(FilterSet):
+    class Meta:
+        model = WorkOrderToday
+        fields = {
+            # --- ID & Numbers ---
+            'id': ['exact'],
+            'wo_number': ['exact', 'icontains'],
+            'report_id': ['exact', 'icontains'],
 
+            # --- Basic Info ---
+            'technician': ['exact', 'icontains'],
+            'full_address': ['icontains'],  # Address usually needs partial search
+            
+            # --- URLs (Critical for NULL check) ---
+            'last_report_link': ['exact', 'isnull'],
+            'unlocked_report_link': ['exact', 'isnull'],
+
+            # --- Status & Booleans ---
+            'status': ['exact', 'icontains'],
+            'tech_report_submitted': ['exact'],
+            'wait_to_lock': ['exact'],
+            'is_deleted': ['exact'],
+            'rme_completed': ['exact'],
+
+            # --- Dates (Range/Time filtering) ---
+            'scheduled_date': ['exact', 'gte', 'lte', 'isnull', 'range'],
+            'elapsed_time': ['exact', 'gte', 'lte', 'isnull'], # Assuming DateTimeField based on your model
+            'moved_to_holding_date': ['exact', 'gte', 'lte', 'isnull'],
+            'deleted_date': ['exact', 'gte', 'lte', 'isnull'],
+            'finalized_date': ['exact', 'gte', 'lte', 'isnull'],
+
+            # --- Details & Text ---
+            'reason': ['icontains'],
+            'notes': ['icontains'],
+
+            # --- Audit / User Info ---
+            'moved_created_by': ['exact', 'icontains'],
+            'deleted_by': ['exact', 'icontains'],
+            'deleted_by_email': ['exact', 'icontains'],
+            'finalized_by': ['exact', 'icontains'],
+            'finalized_by_email': ['exact', 'icontains'],
+        }
 
 class WorkOrderTodayViewSet(viewsets.ModelViewSet):
     """
@@ -29,7 +71,7 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
 
     # Setup for filtering, searching, and ordering
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = '__all__'
+    filterset_class = WorkOrderTodayFilter
     search_fields = ['wo_number', 'full_address', 'technician', 'notes']
     ordering_fields = '__all__'
     ordering = ['-scheduled_date']

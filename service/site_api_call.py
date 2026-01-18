@@ -5,7 +5,7 @@ import os
 
 load_dotenv()
 
-class InseartLocatesService:
+class SiteAPICall:
     def __init__(self):
         # Header setup
         self.headers_data = {
@@ -17,6 +17,7 @@ class InseartLocatesService:
         self.base_url = os.getenv('API_URL')
         self.api_url = self.base_url + "sync-dashboard"
         self.work_orders_today_url = self.base_url + "work-orders-today/"
+        self.get_work_orders_url_isnall = self.base_url + "work-orders-today/?last_report_link__isnull=isnull&unlocked_report_link__isnull=isnull"
         self.login_url = self.base_url + "auth/login"
         
         # Utilities
@@ -105,84 +106,77 @@ class InseartLocatesService:
             print(f"❌ Connection error during insert: {e}")
             return False
     
-    def insert_work_order_today(self, work_order_today: dict):
+    def manage_work_orders(self, method_type, data=None, record_id=None, params=None):
         """
-        Sends locates data to the API. 
-        If token is missing/expired, it attempts to login again.
+        Universal method for GET, POST, PATCH on work-orders-today.
+        
+        :param method_type: 'GET', 'POST', or 'PATCH'
+        :param data: Dictionary data for POST/PATCH body
+        :param record_id: ID string for specific item (needed for PATCH/GET-one)
+        :param params: Dictionary for URL query parameters (e.g., filtering)
         """
-        # 1. Check if we have a token, if not, try to login
+        
+        method = method_type.upper()
+        url = self.work_orders_today_url
+    
+        if record_id:
+            url = f"{self.work_orders_today_url}{record_id}/"
+
+        # 2. Token Check
         if not self.token:
             print("Token missing, trying to login again...")
             self.token = self.login()
             if not self.token:
-                print("Aborting: Could not obtain token.")
-                return False
+                return None
         
-        # 2. Add Authorization header
         self.headers_data['Authorization'] = f'Bearer {self.token}'
-        print("Sending Work Order Today data...")
+
+        print(f"Sending {method} request to: {url}")
+
         try:
-            response = requests.post(self.work_orders_today_url, json=work_order_today, headers=self.headers_data)
+            # 3. Dynamic Request Call
+            response = requests.request(
+                method=method,
+                url=url,
+                json=data,      # POST/PATCH 
+                params=params,  # GET 
+                headers=self.headers_data
+            )
             
-            # Check specifically for success (200 or 201)
+            # 4. Handle Success (200 OK, 201 Created)
             if response.status_code in [200, 201]:
-                print(f"✅ Work Order Today inserted successfully! (Status: {response.status_code})")
-                return True
+                print(f"✅ {method} Successful! (Status: {response.status_code})")
+                return response.json()
             
-            # Handle unauthorized (401) - Maybe token expired?
+            # 5. Handle Token Expiry (401) & Retry
             elif response.status_code == 401:
                 print("⚠️ Token expired. Re-authenticating...")
                 self.token = self.login()
                 if self.token:
-                    # Retry the request once with new token
+                    # Retry with new token
                     self.headers_data['Authorization'] = f'Bearer {self.token}'
-                    retry_response = requests.post(self.work_orders_today_url, json=work_order_today, headers=self.headers_data)
-                    if retry_response.status_code in [200, 201]:
-                        print("✅ Work Order Today inserted successfully after retry.")
-                        return True
+                    response = requests.request(
+                        method=method, url=url, json=data, params=params, headers=self.headers_data
+                    )
+                    
+                    if response.status_code in [200, 201]:
+                        print(f"✅ {method} Successful after retry.")
+                        return response.json()
+                
                 print(f"❌ Failed after retry. Status: {response.status_code}")
-                print("Response:", response.text)
-                return False
+                return None
                 
             else:
-                print(f"❌ Failed to insert Work Order Today. Status: {response.status_code}")
+                print(f"❌ Operation Failed. Status: {response.status_code}")
                 print("Response:", response.text)
-                return False
+                return None
 
         except requests.RequestException as e:
-            print(f"❌ Connection error during insert: {e}")
-            return False
+            print(f"❌ Connection error during {method}: {e}")
+            return None
+        
+            
+        
     
         
 
-# --- Example Usage ---
-if __name__ == "__main__":
-    service = InseartLocatesService()
-    
-    # Dummy data for testing
-    dummy_data = {
-        "filterStartDate": "01/14/2026",
-        "filterEndDate": "01/14/2026",
-        "workOrders": [
-            {
-            "priorityColor": "rgb(128, 96, 77)",
-            "priorityName": "EXCAVATOR",
-            "workOrderNumber": "14523",
-            "customerPO": "",
-            "customerName": "Tracy Hamilton",
-            "customerAddress": "22806 70Th Ave E - Graham Wa 98338",
-            "tags": "",
-            "techName": "02 - Huss",
-            "purchaseStatus": "",
-            "promisedAppointment": "",
-            "createdDate": "01/05/2026 2:20 PM",
-            "scheduledDate": "01/14/2026 8:00 AM - 2:00 PM",
-            "task": "HOME SALE REPAIR(6H)"
-            }
-        ]
-        }
-
-    
-    # Call the new method
-    if service.token:
-        service.insert_locates(dummy_data)

@@ -1,9 +1,11 @@
+import sys
+import asyncio
 from service.baseScraper import BaseScraper
 from time import sleep
 import copy
 
 
-class WorkOrdersScraper(BaseScraper):
+class OnlineRMEScraper(BaseScraper):
     def __init__(self):
         super().__init__()
         
@@ -131,39 +133,85 @@ class WorkOrdersScraper(BaseScraper):
                 
         return rows
     
-    async def run(self):
+    async def run(self, datas:list):
         """Orchestrator method to run the whole process"""
         try:
-            await self.initialize()
-            
-            # Go to Dispatch Board
-            await self.page.goto(self.rules.get('dashboard_url'), wait_until='domcontentloaded')
-            
-            # Login if redirected
-            if "Login" in self.page.url:
-                await self.login_fieldedge()
+            for i in range(len(datas)):
+                if not self.page:
+                    await self.initialize()
+
+                data:dict = datas[i]
+                # Go to Dispatch Board
+                await self.page.goto(self.rules.get('contractor_search_property'), wait_until='domcontentloaded')
                 
-            if self.rules.get('work_order_url', '') != self.page.url:
-                url = self.rules.get('work_order_url')
-                await self.page.goto(url, wait_until='networkidle')
+                # --- CRITICAL FIX BELOW ---
+                # You must await self.page.content() to get the HTML string
+                content = await self.page.locator('//span[@id="lblMultiMatch"]').inner_text()
+                
+                # Login if redirected
+                if "You are currently logged in for Sterling Septic & Plumbing" not in content:
+                    await self.page.goto(self.rules.get('online_RME_url'), wait_until='domcontentloaded')
+                    await self.login_onlineRME()
             
-            try:
-                wait_xpath = self.rules.get("wait_xpath") 
-                await self.page.wait_for_selector(wait_xpath, state='visible', timeout=600000)
-            except Exception as e:
-                print(f"Error waiting for status selector: {e}")
-                return None
+                if self.rules.get('contractor_search_property', '') != self.page.url:
+                    url = self.rules.get('contractor_search_property')
+                    await self.page.goto(url, wait_until='networkidle')
+                
+                try:
+                    wait_xpath = self.rules.get("wait_rme_body") 
+                    await self.page.wait_for_selector(wait_xpath, state='visible', timeout=60000)
+                except Exception as e:
+                    print(f"Error waiting for status selector: {e}")
+                    continue
             
-            await self.select_by_xpaths(name="status_xpath")
-            await self.select_by_xpaths(name='scheduled_date_filter_xpath')
-            await self.select_by_xpaths(name='submit_filter')
-            scraped = await self.scrape_data()
-            result = scraped['rows']
-            rows = await self.get_address(result)
-            return rows
+                full_address = data.get("full_address")
+                if full_address:
+                    streetnum, streetname, *_ = full_address.split(' ')
+                    
+                    await self.select_by_xpaths(name="street_number", value=streetnum)
+                    await self.select_by_xpaths(name="street_name", value=streetname)
+                    await self.select_by_xpaths(name="submit_search_rme")
+                    try:
+                        url = self.rules.get('rme_service_history')
+                        await self.page.goto(url, wait_until='networkidle')
+                        wait_xpath = self.rules.get("wait_rme_report_table") 
+                        await self.page.wait_for_selector(wait_xpath, state='visible', timeout=60000)
+                    except Exception as e:
+                        print(f"Error waiting for status selector: {e}")
+                        continue
+                    await self.select_by_xpaths(name="last_report_link_click")
+                    try:
+                        wait_xpath = self.rules.get("wait_iframe") 
+                        await self.page.wait_for_selector(wait_xpath, state='visible', timeout=60000)
+                    except Exception as e:
+                        print(f"Error waiting for status selector: {e}")
+                        continue
+                    
+                    iframe_locator = self.page.locator(self.rules.get("wait_iframe", "//iframe"))
+                    # 2. Use 'get_attribute' instead of 'get'
+                    src = await iframe_locator.get_attribute("src")
+                    if 'http' not in src:
+                        last_report_link = "https://www.onlinerme.com/" + src
+                    else:
+                        last_report_link = src
+                    datas[i]['last_report_link'] = last_report_link
+                    try:
+                        wait_xpath = self.rules.get("wait_unlocked_report_btn") 
+                        await self.page.wait_for_selector(wait_xpath, state='visible', timeout=60000)
+                    except Exception as e:
+                        print(f"Error waiting for status selector: {e}")
+                        continue
+                    await self.select_by_xpaths(name="unlocked_report_link_xpath")
+                    await self.select_by_xpaths(name='unlocked_report_edit_btn')
+                    
+                    
+                else:
+                    print("Not Found work order Today address.")
+            return datas
 
         except Exception as e:
             # Short error message in terminal
+            print(e)
             print(f"Scraping Error: try again later.")
             return None
         finally:

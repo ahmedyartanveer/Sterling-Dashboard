@@ -1,9 +1,9 @@
 import sys
 import asyncio
 from datetime import datetime
-from service.inseartLocates import InseartLocatesService
 from service.baseScraper import BaseScraper
 from service.workOrdersScraper import WorkOrdersScraper
+from service.onlineRME import OnlineRMEScraper
 
 
 class FieldEdgeScraper(BaseScraper):
@@ -137,7 +137,13 @@ class FieldEdgeScraper(BaseScraper):
             # Login if redirected
             if "Login" in self.page.url:
                 await self.login_fieldedge()
-
+            
+            try:
+                wait_xpath = self.rules.get("task_dropdown_xpath") 
+                await self.page.wait_for_selector(wait_xpath, state='visible', timeout=600000)
+            except Exception as e:
+                print(f"Error waiting for status selector: {e}")
+               
             await self.select_status(self.rules.get('status_name', "Assigned"))
             if self.rules.get('is_apply_task', False):
                 await self.select_checkbox_by_xpath(self.rules.get('task_option_name', "EXCAVATION DRAIN FIELD REPAIR"))
@@ -185,6 +191,27 @@ async def main():
     data_today = await scraper.run()
     if data_today:
         scraper.inseat_workorder_today(data_today)
+    del scraper
+    print("Onine RME start")
+    scraper = OnlineRMEScraper()
+    
+    work_order_null_url_datas = scraper.inserter.manage_work_orders(
+        method_type="GET",
+        params={
+            "last_report_link__isnull": "isnull",
+            "unlocked_report_link__isnull": "isnull"
+        }
+    )
+    print(work_order_null_url_datas)
+    rme_datas = await scraper.run(work_order_null_url_datas)
+    for  data in rme_datas:
+        id = data.get('id')
+        if id:
+            scraper.inserter.manage_work_orders(
+                method_type="PATCH",
+                data=data,
+                record_id=id
+            )
              
     
     

@@ -4,6 +4,12 @@
     "web_url": "https://login.fieldedge.com/Dispatch",
     "dashboard_url": "https://login.fieldedge.com/Dashboard/",
     "work_order_url": "https://login.fieldedge.com/#/List/0",
+    "online_RME_url": "https://www.onlinerme.com/login.aspx",
+    "contractor_search_property": "https://www.onlinerme.com/ContractorSearchProperty.aspx",
+    "rme_service_history": "https://www.onlinerme.com/MainMenu.aspx?Type=HistoryOM&intMenuType=8&sm=15",
+    "RME_username_xpath": "input[name='txtUsername']",
+    "RME_password_xpath": "input[name='txtPassword']",
+    "RME_login_button_xpath": "input[value='Login']",
     "username_xpath": "input[name='UserName']",
     "password_xpath": "input[name='Password']",
     "login_button_xpath": "input[type='submit'][value='Sign in to your account']",
@@ -69,6 +75,46 @@
         "xpath": "//li[@class='action']"
       }
     ],
-    "wait_xpath": "//tbody[@class='fixed-body']"
+    "street_number": [
+      {
+        "action": "input",
+        "xpath": "//input[@name='txtStreetNumber']"
+      }
+    ],
+    "street_name": [
+      {
+        "action": "input",
+        "xpath": "//input[@name='txtSearch']"
+      }
+    ],
+    "submit_search_rme": [
+      {
+        "action": "click",
+        "xpath": "//input[@name='btnSearch']"
+      }
+    ],
+    "last_report_link_click": [
+      {
+        "action": "click",
+        "xpath": " //input[@id='ctl02_DataGridOMhistory_ctl03_btnViewOMreport']"
+      }
+    ],
+    "unlocked_report_link_xpath": [
+      {
+        "action": "click",
+        "xpath": "//input[@name='ctl02$btnViewUnlockedReports']"
+      }
+    ],
+    "unlocked_report_edit_btn": [
+      {
+        "action": "click",
+        "xpath": "//input[@id='ctl02_DataGridOMhistory_ctl03_Edit']"
+      }
+    ],
+    "wait_xpath": "//tbody[@class='fixed-body']",
+    "wait_rme_body": "input[name='txtStreetNumber']",
+    "wait_rme_report_table": "//table[@id='ctl02_DataGridOMhistory']",
+    "wait_unlocked_report_btn": "//input[@name='ctl02$btnViewUnlockedReports']",
+    "wait_iframe": "//iframe"
   }
 ]
