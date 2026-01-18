@@ -217,6 +217,6 @@ class WorkOrdersScraper(BaseScraper):
         
     # print("Scraping finished.")
 
-if __name__ == "__main__":
-    print("Scraping finished.")
+# if __name__ == "__main__":
+#     print("Scraping finished.")
 #     start_scraping()
