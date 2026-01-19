@@ -183,3 +183,6 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     x.strip() for x in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',')
 ]
+
+# GMT-8
+USE_TZ = True

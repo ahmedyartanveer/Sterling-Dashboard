@@ -96,25 +96,19 @@
     "last_report_link_click": [
       {
         "action": "click",
-        "xpath": " //input[@id='ctl02_DataGridOMhistory_ctl03_btnViewOMreport']"
-      }
-    ],
-    "unlocked_report_link_xpath": [
-      {
-        "action": "click",
-        "xpath": "//input[@name='ctl02$btnViewUnlockedReports']"
+        "xpath": "//input[@id='ctl02_DataGridOMhistory_ctl03_btnViewOMreport']"
       }
     ],
     "unlocked_report_edit_btn": [
       {
         "action": "click",
-        "xpath": "//input[@id='ctl02_DataGridOMhistory_ctl03_Edit']"
+        "xpath": "//a[@id='Uc_Header2_rptMenu_ctl02_hypMenuItem']"
       }
     ],
     "wait_xpath": "//tbody[@class='fixed-body']",
     "wait_rme_body": "input[name='txtStreetNumber']",
     "wait_rme_report_table": "//table[@id='ctl02_DataGridOMhistory']",
-    "wait_unlocked_report_btn": "//input[@name='ctl02$btnViewUnlockedReports']",
+    "wait_unlocked_report_btn": "//a[@id='Uc_Header2_rptMenu_ctl02_hypMenuItem']",
     "wait_iframe": "//iframe"
   }
 ]
