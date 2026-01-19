@@ -1,7 +1,7 @@
 # core/scheduler.py
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from service.dashboardLocatesScraper import start_scraping 
+from automation.main import start_scraping
 from dotenv import load_dotenv
 import os
 
