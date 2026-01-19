@@ -177,21 +177,21 @@ class FieldEdgeScraper(BaseScraper):
 
 # --- Execution ---
 async def main():
-    # scraper = FieldEdgeScraper()
-    # data = await scraper.run()
-    # if data:
-    #     if scraper.inseat_locates(data):
-    #         print("Data inserted successfully.")
-    #     else:
-    #         print("Failed to insert data.")
-    # else:
-    #     print("No data scraped or error occurred.")
-    # del scraper
-    # scraper = WorkOrdersScraper()
-    # data_today = await scraper.run()
-    # if data_today:
-    #     scraper.inseat_workorder_today(data_today)
-    # del scraper
+    scraper = FieldEdgeScraper()
+    data = await scraper.run()
+    if data:
+        if scraper.inseat_locates(data):
+            print("Data inserted successfully.")
+        else:
+            print("Failed to insert data.")
+    else:
+        print("No data scraped or error occurred.")
+    del scraper
+    scraper = WorkOrdersScraper()
+    data_today = await scraper.run()
+    if data_today:
+        scraper.inseat_workorder_today(data_today)
+    del scraper
     print("Onine RME start")
     scraper = OnlineRMEScraper()
     
