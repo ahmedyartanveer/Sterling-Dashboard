@@ -134,7 +134,7 @@ class OnlineRMEScraper(BaseScraper):
                         print(f"Error clicking unlock button: {e}")
                 else:
                     print(f"last_report_link : {data.get('last_report_link')}")
-                    print(f"unlocked_report_link : {data.get("unlocked_report_link")}")
+                    print(f"unlocked_report_link : {data.get('unlocked_report_link')}")
                    
 
             except Exception as e:
