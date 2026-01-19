@@ -125,6 +125,31 @@ class FieldEdgeScraper(BaseScraper):
         }""")
 
         return scraped_data
+    
+    
+    async def get_status(self, wo: str) -> str | None:
+        try:
+            # ১. Typo Fix: 'xapth' -> 'xpath'
+            await self.select_by_xpaths(action_list=[{
+                "action": "click",
+                "xpath": f"//span[text()='{wo}']" 
+            }])
+            status_xpath = self.rules.get('locator_status_xpath')
+            status_locator = self.page.locator(status_xpath)
+            
+            await status_locator.wait_for(state="visible") 
+
+            raw_text = await status_locator.text_content()
+            
+            if raw_text:
+                status = raw_text.replace("\xa0", "").strip()
+                return status
+                
+            return None
+
+        except Exception as e:
+            print(f"Get status error for WO '{wo}': {e}")
+            return None
 
     async def run(self):
         """Orchestrator method to run the whole process"""
@@ -155,6 +180,11 @@ class FieldEdgeScraper(BaseScraper):
             await self.set_date_filter(start_date, end_date)
             await self.apply_filters()
             scraped = await self.scrape_data()
+            rows = scraped['rows']
+            for i in range(len(rows)):
+                wo = rows[i].get("workOrderNumber")
+                status = await self.get_status(wo) 
+                rows[i]['tags'] = status if status else ''
             result = {
                 "filterStartDate": start_date,
                 "filterEndDate": end_date,
