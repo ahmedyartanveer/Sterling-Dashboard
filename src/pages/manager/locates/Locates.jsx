@@ -535,6 +535,9 @@ const Locates = () => {
                             ? formatMonthDay(completionDate)
                             : '—';
 
+                    // Use scraped_at as the triggered date (fallback to created_date if not available)
+                    const triggeredDate = dashboard.scraped_at || wo.created_date || wo.requested_date || '';
+
                     allWorkOrders.push({
                         id: wo.id || `ext-${wo.work_order_number || Math.random().toString(36).slice(2, 9)}`,
                         workOrderId: wo.id,
@@ -563,7 +566,7 @@ const Locates = () => {
                         workflowStatus: wo.workflow_status || 'UNKNOWN',
                         dashboardId: dashboard.id || null,
                         // New fields for dates display in Pacific Time
-                        locateTriggeredDate: wo.created_date || wo.requested_date || '',
+                        locateTriggeredDate: triggeredDate, // CHANGED: Use scraped_at
                         locateCalledInDate: wo.called_at || '',
                         clearToDigDate: wo.completion_date || '',
                         targetWorkDate: targetWorkDate,
@@ -2622,7 +2625,7 @@ const LocateTable = ({
                                             {tableType === 'completed' ? (
                                                 // Detailed view (for Completed table)
                                                 <>
-                                                    {/* 1. Locate Triggered */}
+                                                    {/* 1. Locate Triggered (scraped_at) */}
                                                     <Box>
                                                         <Typography
                                                             variant="caption"
@@ -2781,7 +2784,7 @@ const LocateTable = ({
                                                                         ml: 1,
                                                                     }}
                                                                 >
-                                                                    {formatDate(item.requestedDate)}
+                                                                    {formatDate(item.locateTriggeredDate)} {/* Now using scraped_at */}
                                                                 </Typography>
                                                             </Typography>
                                                         </Box>
