@@ -1,6 +1,5 @@
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.utils import timezone
 from datetime import timedelta, datetime
@@ -10,7 +9,7 @@ from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from django_filters import FilterSet
-
+from rest_framework.decorators import action
 from .models import WorkOrderToday, Locates
 from .serializers import WorkOrderTodaySerializer, LocatesSerializer
 
@@ -132,216 +131,166 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
 
 
 # =============================
-# LOCATES ENDPOINTS (From Node.js)
+# LOCATES ENDPOINTS
 # =============================
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_all_locates_data(request):
-    """Get all locates data - equivalent to Node.js getAllLocatesData"""
-    try:
-        data = Locates.objects.all().order_by('-created_at')
-        serializer = LocatesSerializer(data, many=True)
-        
-        return Response({
-            'success': True,
-            'data': serializer.data
-        })
-        
-    except Exception as e:
-        return Response({
-            'success': False,
-            'message': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+class LocatesViewSet(viewsets.ModelViewSet):
+    queryset = Locates.objects.all().order_by('-created_at')
+    serializer_class = LocatesSerializer
+    permission_classes = [IsAuthenticated]
 
+    # 1. GET ALL (Overriding list method)
+    # Equivalent to: get_all_locates_data
+    def list(self, request, *args, **kwargs):
+        try:
+            # Original logic: order by -created_at
+            queryset = self.get_queryset()
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                'success': True,
+                'data': serializer.data
+            })
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['POST'])
-def sync_assigned_locates(request):
-    """Sync assigned locates from scraper - equivalent to Node.js syncAssignedLocates"""
-    try:
-        # Get data from request (in Node.js, this comes from assignedLocatesDispatchBoard service)
-        data = request.data
-        
-        if isinstance(data.get('work_orders'), list):
-            # Filter for EXCAVATOR priority
-            filtered = [w for w in data['work_orders'] if w.get('priority_name') == 'EXCAVATOR']
+    # 2. SYNC LOGIC (Custom Action)
+    # Equivalent to: sync_assigned_locates
+    # Note: Original function didn't have permission_classes, so we use AllowAny for this action to match behavior.
+    @action(detail=False, methods=['post'], url_path='sync', permission_classes=[AllowAny])
+    def sync_locates(self, request):
+        try:
+            data = request.data
             
-            # Deduplicate
-            seen = set()
-            unique = []
-            
-            for w in filtered:
-                wo_number = w.get('work_order_number')
-                if wo_number and wo_number not in seen:
-                    seen.add(wo_number)
-                    unique.append(w)
-            
-            # Create locates in database
-            created_count = 0
-            for wo_data in unique:
-                # Map Node.js field names to Django model field names
-                locate_data = {
-                    'work_order_number': wo_data.get('work_order_number', ''),
-                    'customer_name': wo_data.get('customer_name', ''),
-                    'customer_address': wo_data.get('customer_address', ''),
-                    'status': wo_data.get('status', ''),
-                    'priority_name': wo_data.get('priority_name', ''),
-                    'tech_name': wo_data.get('tech_name', ''),
-                    'scheduled_date': wo_data.get('scheduled_date', ''),
-                    'created_date': wo_data.get('created_date', ''),
-                    'scraped_at': timezone.now()
-                }
+            if isinstance(data.get('workOrders'), list):
+                # Filter for EXCAVATOR priority
+                filtered = [w for w in data['workOrders'] if w.get('priorityName') == 'EXCAVATOR']
                 
-                # Check if already exists
-                if not Locates.objects.filter(work_order_number=locate_data['work_order_number']).exists():
-                    Locates.objects.create(**locate_data)
-                    created_count += 1
+                # Deduplicate
+                seen = set()
+                unique = []
+                
+                for w in filtered:
+                    wo_number = w.get('workOrderNumber')
+                    if wo_number and wo_number not in seen:
+                        seen.add(wo_number)
+                        unique.append(w)
+                
+                # Create locates in database
+                created_count = 0
+                for wo_data in unique:
+                    locate_data = {
+                        'work_order_number': wo_data.get('workOrderNumber', ''),
+                        'customer_name': wo_data.get('customerName', ''),
+                        'customer_address': wo_data.get('customerAddress', ''),
+                        'status': wo_data.get('tags', ''),
+                        'priority_name': wo_data.get('priorityName', ''),
+                        'tech_name': wo_data.get('techName', ''),
+                        'scheduled_date': wo_data.get('scheduledDate', ''),
+                        'created_date': wo_data.get('createdDate', ''),
+                        'scraped_at': timezone.now()
+                    }
+                    
+                    # Check if already exists
+                    if not Locates.objects.filter(work_order_number=locate_data['work_order_number']).exists():
+                        Locates.objects.create(**locate_data)
+                        created_count += 1
+                
+                # Get latest data to return (Logic preserved)
+                latest_locates = Locates.objects.all().order_by('-scraped_at')[:10]
+                serializer = self.get_serializer(latest_locates, many=True)
+                
+                return Response({
+                    'success': True,
+                    'message': f"Dashboard synced successfully with {created_count} new work orders",
+                    'data': serializer.data
+                })
             
-            # Get latest data to return
-            latest_locates = Locates.objects.all().order_by('-scraped_at')[:10]
-            serializer = LocatesSerializer(latest_locates, many=True)
+            return Response({
+                'success': False,
+                'message': 'No work orders data found'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # 3. UPDATE & PATCH (Overriding update method)
+    # Equivalent to: update_locate AND patch_locate
+    def update(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            update_data = request.data
+            partial = kwargs.pop('partial', False) # True if PATCH, False if PUT
+
+            # Custom Logic: Check for duplicate work_order_number
+            if 'work_order_number' in update_data and update_data['work_order_number'] != instance.work_order_number:
+                if Locates.objects.filter(work_order_number=update_data['work_order_number']).exists():
+                    return Response({
+                        'success': False,
+                        'message': 'Work order number already exists'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Perform standard update logic manually to control fields
+            # Note: For PATCH (partial update), we filter out None values/missing keys effectively via serializer or manual set
+            
+            if partial:
+                # Logic for PATCH: Update only provided fields
+                update_object = {}
+                for key, value in update_data.items():
+                    if hasattr(instance, key) and value is not None:
+                        update_object[key] = value
+                
+                if not update_object:
+                    return Response({
+                        'success': False,
+                        'message': 'No valid fields provided for update'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                    
+                for key, value in update_object.items():
+                    setattr(instance, key, value)
+            else:
+                # Logic for PUT: Update allowed fields present in request
+                for key, value in update_data.items():
+                    if hasattr(instance, key):
+                        setattr(instance, key, value)
+
+            instance.save()
+            serializer = self.get_serializer(instance)
+            
+            msg = 'Locate partially updated successfully' if partial else 'Locate updated successfully'
+            return Response({
+                'success': True,
+                'message': msg,
+                'data': serializer.data
+            })
+
+        except Exception as e:
+            # Handle Not Found automatically by get_object(), but catch others
+            return Response({
+                'success': False,
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # 4. DELETE (Overriding destroy method)
+    # Equivalent to: delete_locate
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            deleted_id = instance.id
+            instance.delete()
             
             return Response({
                 'success': True,
-                'message': f"Dashboard synced successfully with {created_count} new work orders",
-                'data': serializer.data
+                'message': 'Locate permanently deleted',
+                'data': {'id': deleted_id}
             })
-        
-        return Response({
-            'success': False,
-            'message': 'No work orders data found'
-        }, status=status.HTTP_400_BAD_REQUEST)
-        
-    except Exception as e:
-        return Response({
-            'success': False,
-            'message': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(['PUT'])
-@permission_classes([IsAuthenticated])
-def update_locate(request, id):
-    """Update a locate record - equivalent to Node.js updateLocate"""
-    try:
-        locate = Locates.objects.filter(id=id).first()
-        
-        if not locate:
+        except Exception as e:
             return Response({
                 'success': False,
-                'message': 'Locate not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        
-        update_data = request.data
-        
-        # Check for duplicate work_order_number if being changed
-        if 'work_order_number' in update_data and update_data['work_order_number'] != locate.work_order_number:
-            if Locates.objects.filter(work_order_number=update_data['work_order_number']).exists():
-                return Response({
-                    'success': False,
-                    'message': 'Work order number already exists'
-                }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Update fields
-        for key, value in update_data.items():
-            if hasattr(locate, key):
-                setattr(locate, key, value)
-        
-        locate.save()
-        
-        serializer = LocatesSerializer(locate)
-        return Response({
-            'success': True,
-            'message': 'Locate updated successfully',
-            'data': serializer.data
-        })
-        
-    except Exception as e:
-        return Response({
-            'success': False,
-            'message': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(['PATCH'])
-@permission_classes([IsAuthenticated])
-def patch_locate(request, id):
-    """Partially update a locate record - equivalent to Node.js patchLocate"""
-    try:
-        locate = Locates.objects.filter(id=id).first()
-        
-        if not locate:
-            return Response({
-                'success': False,
-                'message': 'Locate not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        
-        update_data = request.data
-        
-        # Check for duplicate work_order_number if being changed
-        if 'work_order_number' in update_data and update_data['work_order_number'] != locate.work_order_number:
-            if Locates.objects.filter(work_order_number=update_data['work_order_number']).exists():
-                return Response({
-                    'success': False,
-                    'message': 'Work order number already exists'
-                }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Update only provided fields
-        update_object = {}
-        for key, value in update_data.items():
-            if hasattr(locate, key) and value is not None:
-                update_object[key] = value
-        
-        if not update_object:
-            return Response({
-                'success': False,
-                'message': 'No valid fields provided for update'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Update the locate
-        for key, value in update_object.items():
-            setattr(locate, key, value)
-        
-        locate.save()
-        
-        serializer = LocatesSerializer(locate)
-        return Response({
-            'success': True,
-            'message': 'Locate partially updated successfully',
-            'data': serializer.data
-        })
-        
-    except Exception as e:
-        return Response({
-            'success': False,
-            'message': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def delete_locate(request, id):
-    """Delete a locate record - equivalent to Node.js deleteLocate"""
-    try:
-        locate = Locates.objects.filter(id=id).first()
-        
-        if not locate:
-            return Response({
-                'success': False,
-                'message': 'Locate not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        
-        # Hard delete - completely remove from database
-        locate.delete()
-        
-        return Response({
-            'success': True,
-            'message': 'Locate permanently deleted',
-            'data': {'id': id}
-        })
-        
-    except Exception as e:
-        return Response({
-            'success': False,
-            'message': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

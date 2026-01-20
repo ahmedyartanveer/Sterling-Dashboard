@@ -31,11 +31,11 @@
     "status_xpath": [
       {
         "action": "click",
-        "xpath": "//div[@class='secondary-filter box undefined undefined  class-selected multiple']"
+        "xpath": "//div[@class='filter-name' and normalize-space(text())='Status']"
       },
       {
         "action": "click",
-        "xpath": "//div[@class='secondary-filter box undefined undefined  class-selected multiple']//span[@class='active-clear-selection-text']"
+        "xpath": "(//span[@class='active-clear-selection-text'])[1]"
       },
       {
         "action": "click",
@@ -49,11 +49,11 @@
     "scheduled_date_filter_xpath": [
       {
         "action": "click",
-        "xpath": "//div[@class='secondary-filter box undefined undefined  short date-filter']"
+        "xpath": "//div[@class='filter-name' and normalize-space(text())='Scheduled Date']"
       },
       {
         "action": "click",
-        "xpath": "//li[@id='vs2__option-2']"
+        "xpath": "//li[@id='vs2__option-7']"
       },
       {
         "action": "click",
