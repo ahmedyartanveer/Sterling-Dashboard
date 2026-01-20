@@ -224,7 +224,7 @@ class FieldEdgeScraper(BaseScraper):
                 if wo:
                     status = await self.get_status(wo) 
                     if status:
-                        row['tags'] = status 
+                        row['status'] = status 
 
             result = {
                 "filterStartDate": start_date,

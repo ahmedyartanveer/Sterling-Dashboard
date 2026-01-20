@@ -281,14 +281,3 @@ class TechUserView(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
         return response
-
-# Check Email View
-class CheckEmailView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin]
-
-    def get(self, request, email):
-        user = User.objects.filter(email=email).first()
-        data = None
-        if user:
-            data = {'id': user.id, 'name': user.name, 'email': user.email, 'role': user.role}
-        return Response({'success': True, 'exists': bool(user), 'data': data})

@@ -4,7 +4,7 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
-from .views import AuthView, UserViewSet, TechUserView, CheckEmailView
+from .views import AuthView, UserViewSet, TechUserView
 
 # --- Swagger Config ---
 schema_view = get_schema_view(
@@ -32,7 +32,6 @@ urlpatterns = [
 
     # --- Special User Routes (Must be before router.urls) ---
     path('users/tech', TechUserView.as_view(), name='tech-users'),
-    path('users/check-email/<str:email>', CheckEmailView.as_view(), name='check-email'),
     path('users/bulk-status', UserViewSet.as_view({'patch': 'bulk_status'}), name='bulk-status'),
     path('users/<int:pk>/toggle-status', UserViewSet.as_view({'patch': 'toggle_status'}), name='toggle-status'),
 
