@@ -35,3 +35,4 @@ uritemplate==4.2.0
 urllib3==2.6.3
 python-dotenv==1.2.1
 pytz==2025.2
+beautifulsoup4==4.14.3

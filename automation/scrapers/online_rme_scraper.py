@@ -4,6 +4,7 @@ Scrapes report links from the Online RME system.
 """
 import asyncio
 from typing import List, Dict
+from bs4 import BeautifulSoup
 
 from automation.scrapers.base_scraper import BaseScraper
 
@@ -156,40 +157,65 @@ class OnlineRMEScraper(BaseScraper):
             print(f"❌ Error fetching last report link: {e}")
             return None
     
-    async def fetch_unlocked_report_link(self):
+    async def address_match_in_work_history(self, full_address: str) -> bool:
         """
-        Click edit button to get unlocked report URL.
+        Checks if the address exists in the work history table.
         
         Returns:
-            str: URL of unlocked report or None if not found
+            bool: True if address found, False otherwise.
         """
         try:
-            # Wait for unlock button
-            unlock_btn_xpath = self.rules.get("wait_unlocked_report_btn")
+            print("✅ Full address match calling ....")
+            rme_work_history_url = self.rules.get('rme_work_history_url')
+            await self.page.goto(url=rme_work_history_url, wait_until='domcontentloaded')
+            
+            table_xpath = self.rules.get("wait_work_history_table")
             try:
                 await self.page.wait_for_selector(
-                    unlock_btn_xpath,
-                    state='visible',
-                    timeout=30000
+                    table_xpath, 
+                    state='visible', 
+                    timeout=10000
                 )
             except:
-                pass
+                print("⚠️ Work history table did not appear.")
+                return False
             
-            # Click edit/unlock button
-            await self.perform_actions_by_xpaths(name="unlocked_report_edit_btn")
+            work_history_table_xpath = self.rules.get("work_history_table_xpath")
+            rows = await self.page.locator(work_history_table_xpath).all()
             
-            # Wait for page navigation
-            await asyncio.sleep(3)
+            if not rows:
+                print("⚠️ Table found but it has no rows.")
+                return False
+
+            print(f"Checking {len(rows)} rows for address match...")
             
-            # Get current URL (this is the unlocked report URL)
-            current_url = self.page.url
-            print(f"✅ Unlocked report link: {current_url}")
+            full_address_lower = full_address.lower()
+
+            for row in rows:
+                columns = row.locator("td")
+                column_count = await columns.count()
+                
+                if column_count >= 8:
+                    address_cell = columns.nth(7)
+                    address_text = await address_cell.inner_text()
+                    
+                    if address_text:
+                        clean_addr_text = address_text.strip()
+                        
+                        if "Site Address" in clean_addr_text:
+                            clean_addr_text = clean_addr_text.replace("Site Address ", '').strip()
+                        
+                        # ✅ case-insensitive comparison
+                        if clean_addr_text.lower() in full_address_lower:
+                            print(f"✅ Match found: {clean_addr_text}")
+                            return True
             
-            return current_url
-        
+            print("❌ No address match found.")
+            return False
+
         except Exception as e:
-            print(f"❌ Error fetching unlocked report link: {e}")
-            return None
+            print(f"❌ Error in address_match_in_work_history: {e}")
+            return False
     
     async def run(self, work_orders):
         """
@@ -208,6 +234,7 @@ class OnlineRMEScraper(BaseScraper):
         
         for index, work_order in enumerate(work_orders, start=1):
             print(f"\n📄 Processing work order {index}/{total_count}...")
+            print(work_order)
             
             try:
                 # Ensure authentication before each operation
@@ -245,12 +272,19 @@ class OnlineRMEScraper(BaseScraper):
                         work_orders[index - 1]['last_report_link'] = last_report_link
                 
                 # Fetch unlocked report link if not already present
-                if not work_order.get("unlocked_report_link"):
-                    unlocked_report_link = await self.fetch_unlocked_report_link()
-                    if unlocked_report_link:
-                        work_orders[index - 1]['unlocked_report_link'] = unlocked_report_link
+                if not work_order.get("tech_report_submitted"):
+                    full_address = work_order.get("full_address")
+                    if full_address:
+                        tech_report_submitted = await self.address_match_in_work_history(full_address)
+                        if tech_report_submitted is not None:
+                            work_orders[index - 1]['tech_report_submitted'] = tech_report_submitted
+                        else:
+                            work_orders[index - 1]['tech_report_submitted'] = False
+                    else:
+                        work_orders[index - 1]['tech_report_submitted'] = False
+                        print(f"⏭️  Skipping item {index}: No address provided.")
                 print(f"   Last: {work_order.get('last_report_link')}")
-                print(f"   Unlocked: {work_order.get('unlocked_report_link')}")
+                print(f"   tech_report_submitted: {work_order.get('tech_report_submitted')}")
             
             except Exception as e:
                 print(f"❌ Unexpected error processing item {index} ({full_address}): {e}")

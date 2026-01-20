@@ -70,8 +70,7 @@ async def run_online_rme_scraper():
         work_orders_missing_urls = scraper.api_client.manage_work_orders(
             method_type="GET",
             params={
-                "last_report_link__isnull": "isnull",
-                "unlocked_report_link__isnull": "isnull"
+                "last_report_link__isnull": "isnull"
             }
         )
         
