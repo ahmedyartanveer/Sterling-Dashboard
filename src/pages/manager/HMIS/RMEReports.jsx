@@ -37,7 +37,9 @@ import axiosInstance from '../../../api/axios';
 import { useAuth } from '../../../auth/AuthProvider';
 import { format as formatTZ, toZonedTime } from 'date-fns-tz';
 import pen from '../../../public/icons/Edit.gif';
-import book from '../../../public/icons/report.gif';
+import report from '../../../public/icons/report.gif';
+import locked from '../../../public/icons/locked.gif';
+import discard from '../../../public/icons/btnDel.gif';
 
 import {
     Search,
@@ -50,13 +52,10 @@ import {
     Clock,
     History,
     FileText,
-    File,
     FileSpreadsheet,
     AlertOctagon,
     Save,
-    Edit,
     RotateCcw,
-    ExternalLink,
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import DashboardLoader from '../../../components/Loader/DashboardLoader';
@@ -248,10 +247,17 @@ const PDFViewerModal = ({ open, onClose, pdfUrl }) => {
                         }}>
                             <FileText size={48} color={alpha(GRAY_COLOR, 0.3)} />
                             <Typography variant="body2" sx={{
+                                mt: 2,
                                 color: GRAY_COLOR,
                                 fontSize: '0.9rem',
                             }}>
                                 No PDF available
+                            </Typography>
+                            <Typography variant="caption" sx={{
+                                color: GRAY_COLOR,
+                                fontSize: '0.8rem',
+                            }}>
+                                PDF will appear here when available
                             </Typography>
                         </Box>
                     )}
@@ -266,12 +272,12 @@ const RMEReports = () => {
     const { user: authUser } = useAuth();
 
     // State for each table's selection
-    const [selectedUnverified, setSelectedUnverified] = useState(new Set());
+    const [selectedReportNeeded, setSelectedReportNeeded] = useState(new Set());
+    const [selectedReportSubmitted, setSelectedReportSubmitted] = useState(new Set());
     const [selectedHolding, setSelectedHolding] = useState(new Set());
     const [selectedFinalized, setSelectedFinalized] = useState(new Set());
 
-    // State for actions checkboxes in stage 1
-    const [techReportSubmitted, setTechReportSubmitted] = useState(new Set());
+    // State for actions checkboxes in report submitted table
     const [lockedAction, setLockedAction] = useState(new Set());
     const [waitToLockAction, setWaitToLockAction] = useState(new Set());
     const [deleteAction, setDeleteAction] = useState(new Set());
@@ -284,15 +290,18 @@ const RMEReports = () => {
     const [holdingDeleteAction, setHoldingDeleteAction] = useState(new Set());
 
     // Pagination for each table
-    const [pageUnverified, setPageUnverified] = useState(0);
-    const [rowsPerPageUnverified, setRowsPerPageUnverified] = useState(10);
+    const [pageReportNeeded, setPageReportNeeded] = useState(0);
+    const [rowsPerPageReportNeeded, setRowsPerPageReportNeeded] = useState(10);
+    const [pageReportSubmitted, setPageReportSubmitted] = useState(0);
+    const [rowsPerPageReportSubmitted, setRowsPerPageReportSubmitted] = useState(10);
     const [pageHolding, setPageHolding] = useState(0);
     const [rowsPerPageHolding, setRowsPerPageHolding] = useState(10);
     const [pageFinalized, setPageFinalized] = useState(0);
     const [rowsPerPageFinalized, setRowsPerPageFinalized] = useState(10);
 
     // Search states
-    const [searchUnverified, setSearchUnverified] = useState('');
+    const [searchReportNeeded, setSearchReportNeeded] = useState('');
+    const [searchReportSubmitted, setSearchReportSubmitted] = useState('');
     const [searchHolding, setSearchHolding] = useState('');
     const [searchFinalized, setSearchFinalized] = useState('');
 
@@ -325,9 +334,6 @@ const RMEReports = () => {
         severity: 'success',
     });
 
-    // Local state for tech report checkbox changes
-    const [localTechReportChanges, setLocalTechReportChanges] = useState(new Set());
-
     // Fetch all work orders
     const { data: workOrders = [], isLoading } = useQuery({
         queryKey: ['rme-work-orders'],
@@ -338,7 +344,7 @@ const RMEReports = () => {
         staleTime: 30000,
         refetchInterval: 60000,
     });
-    console.log(workOrders);
+
     // Fetch only deleted work orders for history
     const { data: deletedWorkOrders = [] } = useQuery({
         queryKey: ['rme-deleted-work-orders'],
@@ -353,17 +359,11 @@ const RMEReports = () => {
     // Initialize checkbox states from API data when workOrders change
     useEffect(() => {
         if (workOrders.length > 0) {
-            const newTechReportSubmitted = new Set();
             const newWaitToLockDetails = {};
 
             workOrders.forEach(item => {
                 if (!item.is_deleted && !item.finalized_by && !item.wait_to_lock && !item.moved_to_holding_date) {
-                    if (item.tech_report_submitted) {
-                        newTechReportSubmitted.add(item.id.toString());
-                    }
-
                     if (item.wait_to_lock) {
-                        newWaitToLockAction.add(item.id.toString());
                         newWaitToLockDetails[item.id.toString()] = {
                             reason: item.reason || '',
                             notes: item.notes || ''
@@ -372,8 +372,6 @@ const RMEReports = () => {
                 }
             });
 
-            setTechReportSubmitted(newTechReportSubmitted);
-            setLocalTechReportChanges(new Set());
             setWaitToLockDetails(newWaitToLockDetails);
         }
     }, [workOrders]);
@@ -393,7 +391,8 @@ const RMEReports = () => {
 
     // Process data for different stages
     const processedData = useMemo(() => {
-        const unverified = [];
+        const reportNeeded = [];
+        const reportSubmitted = [];
         const holding = [];
         const finalized = [];
 
@@ -463,19 +462,22 @@ const RMEReports = () => {
                     priorLockedReport: !!item.last_report_link,
                     reason: item.reason || 'Pending Review',
                 });
+            } else if (item.tech_report_submitted) {
+                // Items with tech_report_submitted=true go to Report Submitted table
+                reportSubmitted.push(report);
             } else {
-                unverified.push(report);
+                reportNeeded.push(report);
             }
         });
 
-        return { unverified, holding, finalized };
+        return { reportNeeded, reportSubmitted, holding, finalized };
     }, [workOrders]);
 
     // Filter functions for each table with search
-    const filteredUnverifiedReports = useMemo(() => {
-        let filtered = processedData.unverified;
-        if (searchUnverified) {
-            const searchLower = searchUnverified.toLowerCase();
+    const filteredReportNeeded = useMemo(() => {
+        let filtered = processedData.reportNeeded;
+        if (searchReportNeeded) {
+            const searchLower = searchReportNeeded.toLowerCase();
             filtered = filtered.filter(report =>
                 report.technician?.toLowerCase().includes(searchLower) ||
                 report.address?.toLowerCase().includes(searchLower) ||
@@ -485,7 +487,22 @@ const RMEReports = () => {
             );
         }
         return filtered;
-    }, [processedData.unverified, searchUnverified]);
+    }, [processedData.reportNeeded, searchReportNeeded]);
+
+    const filteredReportSubmitted = useMemo(() => {
+        let filtered = processedData.reportSubmitted;
+        if (searchReportSubmitted) {
+            const searchLower = searchReportSubmitted.toLowerCase();
+            filtered = filtered.filter(report =>
+                report.technician?.toLowerCase().includes(searchLower) ||
+                report.address?.toLowerCase().includes(searchLower) ||
+                report.street?.toLowerCase().includes(searchLower) ||
+                report.city?.toLowerCase().includes(searchLower) ||
+                report.woNumber?.toLowerCase().includes(searchLower)
+            );
+        }
+        return filtered;
+    }, [processedData.reportSubmitted, searchReportSubmitted]);
 
     const filteredHoldingReports = useMemo(() => {
         let filtered = processedData.holding;
@@ -530,20 +547,6 @@ const RMEReports = () => {
     };
 
     // Mutations
-    const bulkTechReportMutation = useMutation({
-        mutationFn: async (updates) => {
-            const promises = updates.map(({ id, techReportSubmitted }) =>
-                axiosInstance.patch(`/work-orders-today/${id}/`, {
-                    tech_report_submitted: techReportSubmitted,
-                })
-            );
-            await Promise.all(promises);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['rme-work-orders']);
-        },
-    });
-
     const bulkSoftDeleteMutation = useMutation({
         mutationFn: async (items) => {
             const promises = items.map(item =>
@@ -676,37 +679,18 @@ const RMEReports = () => {
         },
     });
 
-    // Handle tech report checkbox toggle
-    const handleTechReportToggle = (id, isChecked) => {
-        const newSet = new Set(techReportSubmitted);
-        const newLocalChanges = new Set(localTechReportChanges);
-
-        if (isChecked) {
-            newSet.add(id);
-            newLocalChanges.add(id);
-        } else {
-            newSet.delete(id);
-            newLocalChanges.add(id);
-
-            // Clear Locked and Wait To Lock if Tech Report Submitted is unchecked
-            const lockedSet = new Set(lockedAction);
-            lockedSet.delete(id);
-            setLockedAction(lockedSet);
-
-            const waitToLockSet = new Set(waitToLockAction);
-            waitToLockSet.delete(id);
-            setWaitToLockAction(waitToLockSet);
-
-            // Clear wait to lock details
-            if (waitToLockSet.has(id)) {
-                const newDetails = { ...waitToLockDetails };
-                delete newDetails[id];
-                setWaitToLockDetails(newDetails);
-            }
+    // Handle tech report checkbox toggle in Report Submitted table
+    const handleTechReportToggle = async (id, isChecked) => {
+        try {
+            await axiosInstance.patch(`/work-orders-today/${id}/`, {
+                tech_report_submitted: isChecked,
+            });
+            queryClient.invalidateQueries(['rme-work-orders']);
+            showSnackbar(`Tech Report Submitted ${isChecked ? 'checked' : 'unchecked'}`, 'success');
+        } catch (error) {
+            console.error('Error updating tech report:', error);
+            showSnackbar('Failed to update Tech Report Submitted', 'error');
         }
-
-        setTechReportSubmitted(newSet);
-        setLocalTechReportChanges(newLocalChanges);
     };
 
     const handleLockedToggle = (id) => {
@@ -735,10 +719,6 @@ const RMEReports = () => {
             setWaitToLockDetails(newDetails);
         } else {
             newSet.add(id);
-            const techReportSet = new Set(techReportSubmitted);
-            techReportSet.add(id);
-            setTechReportSubmitted(techReportSet);
-
             const lockedSet = new Set(lockedAction);
             lockedSet.delete(id);
             setLockedAction(lockedSet);
@@ -761,10 +741,6 @@ const RMEReports = () => {
             newSet.delete(id);
         } else {
             newSet.add(id);
-            const techReportSet = new Set(techReportSubmitted);
-            techReportSet.delete(id);
-            setTechReportSubmitted(techReportSet);
-
             const lockedSet = new Set(lockedAction);
             lockedSet.delete(id);
             setLockedAction(lockedSet);
@@ -799,10 +775,16 @@ const RMEReports = () => {
     };
 
     // Pagination handlers
-    const handleChangePageUnverified = (event, newPage) => setPageUnverified(newPage);
-    const handleChangeRowsPerPageUnverified = (event) => {
-        setRowsPerPageUnverified(parseInt(event.target.value, 10));
-        setPageUnverified(0);
+    const handleChangePageReportNeeded = (event, newPage) => setPageReportNeeded(newPage);
+    const handleChangeRowsPerPageReportNeeded = (event) => {
+        setRowsPerPageReportNeeded(parseInt(event.target.value, 10));
+        setPageReportNeeded(0);
+    };
+
+    const handleChangePageReportSubmitted = (event, newPage) => setPageReportSubmitted(newPage);
+    const handleChangeRowsPerPageReportSubmitted = (event) => {
+        setRowsPerPageReportSubmitted(parseInt(event.target.value, 10));
+        setPageReportSubmitted(0);
     };
 
     const handleChangePageHolding = (event, newPage) => setPageHolding(newPage);
@@ -856,7 +838,8 @@ const RMEReports = () => {
         if (selectionSet.size === 0) return;
 
         const itemsToDelete = Array.from(selectionSet).map(id => {
-            const item = processedData.unverified.find(r => r.id === id) ||
+            const item = processedData.reportNeeded.find(r => r.id === id) ||
+                processedData.reportSubmitted.find(r => r.id === id) ||
                 processedData.holding.find(r => r.id === id) ||
                 processedData.finalized.find(r => r.id === id);
             return { id, ...item?.rawData };
@@ -870,7 +853,8 @@ const RMEReports = () => {
         try {
             await bulkSoftDeleteMutation.mutateAsync(itemsToDelete);
 
-            setSelectedUnverified(new Set());
+            setSelectedReportNeeded(new Set());
+            setSelectedReportSubmitted(new Set());
             setSelectedHolding(new Set());
             setSelectedFinalized(new Set());
             setDeleteDialogOpen(false);
@@ -921,23 +905,21 @@ const RMEReports = () => {
             await bulkRestoreMutation.mutateAsync(itemsToRestore);
             setSelectedHistoryItems(new Set());
             setRestoreDialogOpen(false);
-            setSelectedForRestore(new Set());
+            setSelectedForRestore(newSet);
         } catch (error) {
             console.error('Restore error:', error);
         }
     };
 
-    // Handle save changes for stage 1
-    const handleSaveStage1Changes = async () => {
-        const selectedItems = unverifiedPageItems.filter(item =>
+    // Handle save changes for Report Submitted table
+    const handleSaveReportSubmittedChanges = async () => {
+        const selectedItems = reportSubmittedPageItems.filter(item =>
             lockedAction.has(item.id) ||
             waitToLockAction.has(item.id) ||
-            deleteAction.has(item.id) ||
-            localTechReportChanges.has(item.id)
+            deleteAction.has(item.id)
         );
 
         const actions = {
-            techReportUpdates: [],
             lockedAndCompleted: [],
             waitToLock: [],
             deleteUpdates: [],
@@ -948,33 +930,14 @@ const RMEReports = () => {
             const hasLocked = lockedAction.has(item.id);
             const hasWaitToLock = waitToLockAction.has(item.id);
             const hasDelete = deleteAction.has(item.id);
-            const hasTechReportChanged = localTechReportChanges.has(item.id);
 
-            // Handle Tech Report Submitted changes
-            if (hasTechReportChanged && !hasLocked && !hasWaitToLock && !hasDelete) {
-                const currentState = techReportSubmitted.has(item.id);
-                actions.techReportUpdates.push({
+            // Check combination 1: Locked
+            if (hasLocked && !hasWaitToLock && !hasDelete) {
+                actions.lockedAndCompleted.push({
                     id: item.id,
-                    techReportSubmitted: currentState,
+                    reportId: `RME-${new Date().getFullYear()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
                     rawData: item.rawData,
                 });
-            }
-
-            // Check combination 1: Locked (Tech Report Submitted must be checked)
-            if (hasLocked && !hasWaitToLock && !hasDelete) {
-                if (techReportSubmitted.has(item.id)) {
-                    actions.lockedAndCompleted.push({
-                        id: item.id,
-                        reportId: `RME-${new Date().getFullYear()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-                        rawData: item.rawData,
-                    });
-                } else {
-                    actions.invalidCombinations.push({
-                        id: item.id,
-                        address: item.address,
-                        error: 'Tech Report Submitted must be checked for Locked action'
-                    });
-                }
             }
             // Check combination 2: Wait to Lock
             else if (hasWaitToLock && !hasLocked && !hasDelete) {
@@ -1015,12 +978,6 @@ const RMEReports = () => {
         // Execute API calls
         try {
             let message = '';
-
-            // Process tech report updates
-            if (actions.techReportUpdates.length > 0) {
-                await bulkTechReportMutation.mutateAsync(actions.techReportUpdates);
-                message += `${actions.techReportUpdates.length} tech report status(es) updated. `;
-            }
 
             // Process locked and completed
             if (actions.lockedAndCompleted.length > 0) {
@@ -1073,12 +1030,11 @@ const RMEReports = () => {
                 showSnackbar('No changes to save', 'info');
             }
 
-            // Clear checkboxes and local changes after processing
+            // Clear checkboxes after processing
             setLockedAction(new Set());
             setWaitToLockAction(new Set());
             setDeleteAction(new Set());
             setWaitToLockDetails({});
-            setLocalTechReportChanges(new Set());
 
         } catch (error) {
             console.error('Save changes error:', error);
@@ -1144,9 +1100,14 @@ const RMEReports = () => {
     };
 
     // Paginated items
-    const unverifiedPageItems = filteredUnverifiedReports.slice(
-        pageUnverified * rowsPerPageUnverified,
-        pageUnverified * rowsPerPageUnverified + rowsPerPageUnverified
+    const reportNeededPageItems = filteredReportNeeded.slice(
+        pageReportNeeded * rowsPerPageReportNeeded,
+        pageReportNeeded * rowsPerPageReportNeeded + rowsPerPageReportNeeded
+    );
+
+    const reportSubmittedPageItems = filteredReportSubmitted.slice(
+        pageReportSubmitted * rowsPerPageReportSubmitted,
+        pageReportSubmitted * rowsPerPageReportSubmitted + rowsPerPageReportSubmitted
     );
 
     const holdingPageItems = filteredHoldingReports.slice(
@@ -1195,7 +1156,7 @@ const RMEReports = () => {
                             fontWeight: 400,
                         }}
                     >
-                        Track RME reports through 3 stages: Unverified → Holding → Finalized
+                        Track RME reports through 4 stages: Report Needed → Report Submitted → Holding → Finalized
                     </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -1220,15 +1181,15 @@ const RMEReports = () => {
                 </Box>
             </Box>
 
-            {/* Stage 1: Unverified Reports */}
+            {/* Stage 1: Report Needed Reports */}
             <Section
-                title="Stage 1: Unverified"
+                title="Stage 1: Report Needed"
                 color={BLUE_COLOR}
-                count={filteredUnverifiedReports.length}
-                selectedCount={selectedUnverified.size}
+                count={filteredReportNeeded.length}
+                selectedCount={selectedReportNeeded.size}
                 onDelete={() => {
-                    setSelectedForDeletion(selectedUnverified);
-                    setDeletionSection('Unverified');
+                    setSelectedForDeletion(selectedReportNeeded);
+                    setDeletionSection('Report Needed');
                     setDeleteDialogOpen(true);
                 }}
                 icon={<FileSpreadsheet size={20} />}
@@ -1236,21 +1197,59 @@ const RMEReports = () => {
                 additionalActions={
                     <Stack direction="row" spacing={1} alignItems="center">
                         <SearchInput
-                            value={searchUnverified}
-                            onChange={setSearchUnverified}
-                            placeholder="Search unverified..."
+                            value={searchReportNeeded}
+                            onChange={setSearchReportNeeded}
+                            placeholder="Search report needed..."
+                        />
+                    </Stack>
+                }
+            >
+                <ReportNeededTable
+                    items={reportNeededPageItems}
+                    selected={selectedReportNeeded}
+                    onToggleSelect={(id) => toggleSelection(setSelectedReportNeeded, id)}
+                    onToggleAll={() => setSelectedReportNeeded(toggleAllSelection(selectedReportNeeded, filteredReportNeeded, reportNeededPageItems))}
+                    color={BLUE_COLOR}
+                    totalCount={filteredReportNeeded.length}
+                    page={pageReportNeeded}
+                    rowsPerPage={rowsPerPageReportNeeded}
+                    onPageChange={handleChangePageReportNeeded}
+                    onRowsPerPageChange={handleChangeRowsPerPageReportNeeded}
+                    onViewPDF={handleViewPDF}
+                    onUnlockedReportClick={handleUnlockedReportClick}
+                />
+            </Section>
+
+            {/* Report Submitted Table */}
+            <Section
+                title="Stage 2: Report Submitted"
+                color={ORANGE_COLOR}
+                count={filteredReportSubmitted.length}
+                selectedCount={selectedReportSubmitted.size}
+                onDelete={() => {
+                    setSelectedForDeletion(selectedReportSubmitted);
+                    setDeletionSection('Report Submitted');
+                    setDeleteDialogOpen(true);
+                }}
+                icon={<AlertOctagon size={20} />}
+                subtitle="Reports ready for processing"
+                additionalActions={
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <SearchInput
+                            value={searchReportSubmitted}
+                            onChange={setSearchReportSubmitted}
+                            placeholder="Search report submitted..."
                         />
                         <Button
                             variant="contained"
                             color="warning"
                             size="small"
-                            onClick={handleSaveStage1Changes}
+                            onClick={handleSaveReportSubmittedChanges}
                             startIcon={<Save size={14} />}
                             disabled={
                                 lockedAction.size === 0 &&
                                 waitToLockAction.size === 0 &&
-                                deleteAction.size === 0 &&
-                                localTechReportChanges.size === 0
+                                deleteAction.size === 0
                             }
                             sx={{
                                 textTransform: 'none',
@@ -1268,13 +1267,11 @@ const RMEReports = () => {
                     </Stack>
                 }
             >
-                <UnverifiedTable
-                    items={unverifiedPageItems}
-                    selected={selectedUnverified}
-                    onToggleSelect={(id) => toggleSelection(setSelectedUnverified, id)}
-                    onToggleAll={() => setSelectedUnverified(toggleAllSelection(selectedUnverified, filteredUnverifiedReports, unverifiedPageItems))}
-                    techReportSubmitted={techReportSubmitted}
-                    onTechReportToggle={handleTechReportToggle}
+                <ReportSubmittedTable
+                    items={reportSubmittedPageItems}
+                    selected={selectedReportSubmitted}
+                    onToggleSelect={(id) => toggleSelection(setSelectedReportSubmitted, id)}
+                    onToggleAll={() => setSelectedReportSubmitted(toggleAllSelection(selectedReportSubmitted, filteredReportSubmitted, reportSubmittedPageItems))}
                     lockedAction={lockedAction}
                     onLockedToggle={handleLockedToggle}
                     waitToLockAction={waitToLockAction}
@@ -1284,25 +1281,24 @@ const RMEReports = () => {
                     waitToLockDetails={waitToLockDetails}
                     onWaitToLockReasonChange={handleWaitToLockReasonChange}
                     onWaitToLockNotesChange={handleWaitToLockNotesChange}
-                    onSaveStage1Changes={handleSaveStage1Changes}
+                    onSaveChanges={handleSaveReportSubmittedChanges}
                     lockedActionSize={lockedAction.size}
                     waitToLockActionSize={waitToLockAction.size}
                     deleteActionSize={deleteAction.size}
-                    localTechReportChangesSize={localTechReportChanges.size}
-                    color={BLUE_COLOR}
-                    totalCount={filteredUnverifiedReports.length}
-                    page={pageUnverified}
-                    rowsPerPage={rowsPerPageUnverified}
-                    onPageChange={handleChangePageUnverified}
-                    onRowsPerPageChange={handleChangeRowsPerPageUnverified}
+                    color={ORANGE_COLOR}
+                    totalCount={filteredReportSubmitted.length}
+                    page={pageReportSubmitted}
+                    rowsPerPage={rowsPerPageReportSubmitted}
+                    onPageChange={handleChangePageReportSubmitted}
+                    onRowsPerPageChange={handleChangeRowsPerPageReportSubmitted}
                     onViewPDF={handleViewPDF}
                     onUnlockedReportClick={handleUnlockedReportClick}
                 />
             </Section>
 
-            {/* Stage 2: Holding Reports */}
+            {/* Stage 3: Holding Reports */}
             <Section
-                title="Stage 2: Holding"
+                title="Stage 3: Holding"
                 color={ORANGE_COLOR}
                 count={filteredHoldingReports.length}
                 selectedCount={selectedHolding.size}
@@ -1363,9 +1359,9 @@ const RMEReports = () => {
                 />
             </Section>
 
-            {/* Stage 3: Finalized Reports */}
+            {/* Stage 4: Finalized Reports */}
             <Section
-                title="Stage 3: Finalized"
+                title="Stage 4: Finalized"
                 color={GREEN_COLOR}
                 count={filteredFinalizedReports.length}
                 selectedCount={selectedFinalized.size}
@@ -2040,7 +2036,7 @@ const RMEReports = () => {
                                     fontWeight: 400,
                                 }}
                             >
-                                Restored items will be moved back to the Unverified stage.
+                                Restored items will be moved back to the Report Needed stage.
                             </Typography>
                         </Box>
                     </Box>
@@ -2419,13 +2415,227 @@ const SearchInput = ({ value, onChange, placeholder }) => (
     </Box>
 );
 
-const UnverifiedTable = ({
+const ReportNeededTable = ({
     items,
     selected,
     onToggleSelect,
     onToggleAll,
-    techReportSubmitted,
-    onTechReportToggle,
+    color,
+    totalCount,
+    page,
+    rowsPerPage,
+    onPageChange,
+    onRowsPerPageChange,
+    onViewPDF,
+    onUnlockedReportClick,
+}) => {
+    const allSelectedOnPage = items.length > 0 && items.every(item => selected.has(item.id));
+    const someSelectedOnPage = items.length > 0 && items.some(item => selected.has(item.id));
+
+    return (
+        <TableContainer>
+            <Helmet>
+                <title>RME | Sterling Septic & Plumbing LLC</title>
+                <meta name="description" content="Super Admin RME page" />
+            </Helmet>
+            <Table size="small">
+                <TableHead>
+                    <TableRow sx={{
+                        bgcolor: alpha(color, 0.04),
+                        '& th': {
+                            borderBottom: `2px solid ${alpha(color, 0.1)}`,
+                            fontWeight: 600,
+                            fontSize: '0.8rem',
+                            color: TEXT_COLOR,
+                            py: 1.5,
+                        }
+                    }}>
+                        <TableCell
+                            padding="checkbox"
+                            width={50}
+                            sx={{
+                                color: TEXT_COLOR,
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                py: 1.5,
+                                pl: 2.5,
+                            }}
+                        >
+                            <Checkbox
+                                size="small"
+                                checked={allSelectedOnPage}
+                                indeterminate={someSelectedOnPage && !allSelectedOnPage}
+                                onChange={onToggleAll}
+                                sx={{
+                                    color: TEXT_COLOR,
+                                    padding: '4px',
+                                }}
+                            />
+                        </TableCell>
+                        <TableCell>W.O Date & Elapsed Time</TableCell>
+                        <TableCell>Technician</TableCell>
+                        <TableCell>Address</TableCell>
+                        <TableCell align="center">Last Report</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {items.length === 0 ? (
+                        <TableRow>
+                            <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                                <Box sx={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                }}>
+                                    <FileSpreadsheet size={32} color={alpha(TEXT_COLOR, 0.2)} />
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            color: TEXT_COLOR,
+                                            opacity: 0.6,
+                                            fontSize: '0.85rem',
+                                            fontWeight: 500,
+                                        }}
+                                    >
+                                        No reports needed
+                                    </Typography>
+                                </Box>
+                            </TableCell>
+                        </TableRow>
+                    ) : (
+                        items.map((item) => {
+                            const isSelected = selected.has(item.id);
+
+                            return (
+                                <TableRow
+                                    key={item.id}
+                                    hover
+                                    sx={{
+                                        bgcolor: isSelected ? alpha(color, 0.1) : 'white',
+                                        '&:hover': {
+                                            backgroundColor: alpha(color, 0.05),
+                                        },
+                                        '&:last-child td': {
+                                            borderBottom: 'none',
+                                        },
+                                    }}
+                                >
+                                    <TableCell padding="checkbox" sx={{ pl: 2.5, py: 1.5 }}>
+                                        <Checkbox
+                                            checked={isSelected}
+                                            onChange={() => onToggleSelect(item.id)}
+                                            size="small"
+                                            sx={{
+                                                color: TEXT_COLOR,
+                                                padding: '4px',
+                                            }}
+                                        />
+                                    </TableCell>
+                                    <TableCell sx={{ py: 1.5 }}>
+                                        <Box>
+                                            <Typography variant="body2" sx={{ fontWeight: 500, color: TEXT_COLOR }}>
+                                                {item.date}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{
+                                                color: item.elapsedColor,
+                                                fontWeight: 600,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 0.5
+                                            }}>
+                                                <Timer size={12} />
+                                                {item.elapsedTime}
+                                            </Typography>
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell sx={{ py: 1.5 }}>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <Avatar sx={{
+                                                width: 28,
+                                                height: 28,
+                                                bgcolor: color,
+                                                fontSize: '0.85rem',
+                                                fontWeight: 600
+                                            }}>
+                                                {item.technicianInitial}
+                                            </Avatar>
+                                            <Typography variant="body2">{item.technician}</Typography>
+                                        </Stack>
+                                    </TableCell>
+                                    <TableCell sx={{ py: 1.5 }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                            {item.street}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: GRAY_COLOR }}>
+                                            {item.city}, {item.state} {item.zip}
+                                        </Typography>
+                                    </TableCell>
+                                    <TableCell align="center" sx={{ py: 1.5 }}>
+                                        {item.lastReport ? (
+                                            <Tooltip title="View Last Locked Report">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => onViewPDF(item.lastReportLink)}
+                                                    sx={{
+                                                        color: BLUE_COLOR,
+                                                        '&:hover': {
+                                                            backgroundColor: alpha(BLUE_COLOR, 0.1),
+                                                        },
+                                                    }}
+                                                >
+                                                    <img src={report} alt="view-report" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        ) : (
+                                            <Typography variant="caption" sx={{ color: GRAY_COLOR }}>—</Typography>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })
+                    )}
+                </TableBody>
+            </Table>
+
+            {totalCount > 0 && (
+                <TablePagination
+                    rowsPerPageOptions={[5, 10, 25, 50]}
+                    component="div"
+                    count={totalCount}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    onPageChange={onPageChange}
+                    onRowsPerPageChange={onRowsPerPageChange}
+                    sx={{
+                        borderTop: `1px solid ${alpha(color, 0.1)}`,
+                        '& .MuiTablePagination-toolbar': {
+                            minHeight: '52px',
+                            padding: '0 16px',
+                        },
+                        '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                            fontSize: '0.8rem',
+                            color: TEXT_COLOR,
+                            fontWeight: 400,
+                        },
+                        '& .MuiTablePagination-actions': {
+                            marginLeft: '8px',
+                        },
+                        '& .MuiIconButton-root': {
+                            padding: '6px',
+                        },
+                    }}
+                />
+            )}
+        </TableContainer>
+    );
+};
+
+const ReportSubmittedTable = ({
+    items,
+    selected,
+    onToggleSelect,
+    onToggleAll,
     lockedAction,
     onLockedToggle,
     waitToLockAction,
@@ -2435,11 +2645,10 @@ const UnverifiedTable = ({
     waitToLockDetails,
     onWaitToLockReasonChange,
     onWaitToLockNotesChange,
-    onSaveStage1Changes,
+    onSaveChanges,
     lockedActionSize,
     waitToLockActionSize,
     deleteActionSize,
-    localTechReportChangesSize,
     color,
     totalCount,
     page,
@@ -2455,10 +2664,6 @@ const UnverifiedTable = ({
     return (
         <>
             <TableContainer>
-                <Helmet>
-                    <title>RME | Sterling Septic & Plumbing LLC</title>
-                    <meta name="description" content="Super Admin RME page" />
-                </Helmet>
                 <Table size="small">
                     <TableHead>
                         <TableRow sx={{
@@ -2498,16 +2703,15 @@ const UnverifiedTable = ({
                             <TableCell>Address</TableCell>
                             <TableCell align="center">Last Report</TableCell>
                             <TableCell align="center">Unlocked Report</TableCell>
-                            <TableCell align="center">Tech Report Submitted</TableCell>
                             <TableCell align="center">LOCKED</TableCell>
                             <TableCell align="center">Wait To Lock</TableCell>
-                            <TableCell align="center">DELETE</TableCell>
+                            <TableCell align="center">DISCARD</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {items.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={11} align="center" sx={{ py: 6 }}>
+                                <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                                     <Box sx={{
                                         display: 'flex',
                                         flexDirection: 'column',
@@ -2524,7 +2728,7 @@ const UnverifiedTable = ({
                                                 fontWeight: 500,
                                             }}
                                         >
-                                            No records found
+                                            No reports submitted
                                         </Typography>
                                     </Box>
                                 </TableCell>
@@ -2532,7 +2736,7 @@ const UnverifiedTable = ({
                         ) : (
                             items.map((item) => {
                                 const isSelected = selected.has(item.id);
-                                const isTechReportSubmitted = techReportSubmitted.has(item.id);
+                                const isTechReportSubmitted = item.techReportSubmitted;
                                 const isLocked = lockedAction.has(item.id);
                                 const isWaitToLock = waitToLockAction.has(item.id);
                                 const isDelete = deleteAction.has(item.id);
@@ -2615,7 +2819,7 @@ const UnverifiedTable = ({
                                                                 },
                                                             }}
                                                         >
-                                                            <img src={book} alt="view-report" />
+                                                            <img src={report} alt="view-report" />
                                                         </IconButton>
                                                     </Tooltip>
                                                 ) : (
@@ -2643,45 +2847,33 @@ const UnverifiedTable = ({
                                                 )}
                                             </TableCell>
                                             <TableCell align="center" sx={{ py: 1.5 }}>
-                                                <Tooltip title="Tech Report Submitted - Updates on Save Changes">
-                                                    <Checkbox
+                                                <Tooltip title="Locked - Requires Save Changes">
+                                                    <IconButton
                                                         size="small"
-                                                        checked={isTechReportSubmitted}
-                                                        onChange={(e) => onTechReportToggle(item.id, e.target.checked)}
+                                                        onClick={() => onLockedToggle(item.id)}
                                                         disabled={isWaitToLock || isDelete}
                                                         sx={{
                                                             padding: '6px',
-                                                            '&.Mui-disabled': {
-                                                                opacity: 0.5,
-                                                            }
                                                         }}
-                                                    />
+                                                    >
+                                                        <img
+                                                            src={locked}
+                                                            alt="locked"
+                                                            style={{
+                                                                width: '20px',
+                                                                height: '20px',
+                                                            }}
+                                                        />
+                                                    </IconButton>
                                                 </Tooltip>
                                             </TableCell>
                                             <TableCell align="center" sx={{ py: 1.5 }}>
-                                                <Tooltip title="Locked - Requires Save Changes and Tech Report Submitted must be checked">
-                                                    <Checkbox
-                                                        size="small"
-                                                        checked={isLocked}
-                                                        onChange={() => onLockedToggle(item.id)}
-                                                        disabled={!isTechReportSubmitted || isWaitToLock || isDelete}
-                                                        sx={{
-                                                            padding: '6px',
-                                                            color: isTechReportSubmitted ? 'inherit' : alpha(TEXT_COLOR, 0.3),
-                                                            '&.Mui-disabled': {
-                                                                opacity: 0.5,
-                                                            }
-                                                        }}
-                                                    />
-                                                </Tooltip>
-                                            </TableCell>
-                                            <TableCell align="center" sx={{ py: 1.5 }}>
-                                                <Tooltip title="Wait to Lock - Requires Save Changes and Tech Report Submitted must be checked">
+                                                <Tooltip title="Wait to Lock - Requires Save Changes">
                                                     <Checkbox
                                                         size="small"
                                                         checked={isWaitToLock}
                                                         onChange={() => onWaitToLockToggle(item.id)}
-                                                        disabled={!isTechReportSubmitted || isLocked || isDelete}
+                                                        disabled={isLocked || isDelete}
                                                         sx={{
                                                             padding: '6px',
                                                             color: isTechReportSubmitted ? 'inherit' : alpha(TEXT_COLOR, 0.3),
@@ -2693,14 +2885,24 @@ const UnverifiedTable = ({
                                                 </Tooltip>
                                             </TableCell>
                                             <TableCell align="center" sx={{ py: 1.5 }}>
-                                                <Tooltip title="Delete - Updates status to 'DELETED' and rme_completed=true on Save Changes">
-                                                    <Checkbox
+                                                <Tooltip title="Discard - Updates status to 'DELETED' on Save Changes">
+                                                    <IconButton
                                                         size="small"
-                                                        checked={isDelete}
-                                                        onChange={() => onDeleteToggle(item.id)}
+                                                        onClick={() => onDeleteToggle(item.id)}
                                                         disabled={isLocked || isWaitToLock}
-                                                        sx={{ padding: '6px' }}
-                                                    />
+                                                        sx={{
+                                                            padding: '6px',
+                                                        }}
+                                                    >
+                                                        <img
+                                                            src={discard}
+                                                            alt="discard"
+                                                            style={{
+                                                                width: '20px',
+                                                                height: '20px',
+                                                            }}
+                                                        />
+                                                    </IconButton>
                                                 </Tooltip>
                                             </TableCell>
                                         </TableRow>
@@ -2708,7 +2910,7 @@ const UnverifiedTable = ({
                                         {/* Wait to Lock Details Row */}
                                         {isWaitToLock && (
                                             <TableRow sx={{ bgcolor: alpha(ORANGE_COLOR, 0.05) }}>
-                                                <TableCell colSpan={11} sx={{ p: 2 }}>
+                                                <TableCell colSpan={9} sx={{ p: 2 }}>
                                                     <Box sx={{ pl: 6 }}>
                                                         <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 1, color: ORANGE_COLOR }}>
                                                             Additional Information Required:
@@ -2743,12 +2945,11 @@ const UnverifiedTable = ({
                                                                 variant="contained"
                                                                 color="warning"
                                                                 size="small"
-                                                                onClick={onSaveStage1Changes}
+                                                                onClick={onSaveChanges}
                                                                 disabled={
                                                                     lockedActionSize === 0 &&
                                                                     waitToLockActionSize === 0 &&
-                                                                    deleteActionSize === 0 &&
-                                                                    localTechReportChangesSize === 0
+                                                                    deleteActionSize === 0
                                                                 }
                                                                 startIcon={<Save size={14} />}
                                                                 sx={{
@@ -2873,13 +3074,13 @@ const HoldingTable = ({
                         <TableCell align="center">Unlocked Report Link</TableCell>
                         <TableCell>Reason in Holding & Notes</TableCell>
                         <TableCell align="center">LOCKED</TableCell>
-                        <TableCell align="center">DELETE</TableCell>
+                        <TableCell align="center">DISCARD</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
                     {items.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
+                            <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                                 <Box sx={{
                                     display: 'flex',
                                     flexDirection: 'column',
@@ -2896,7 +3097,7 @@ const HoldingTable = ({
                                             fontWeight: 500,
                                         }}
                                     >
-                                        No records found
+                                        No holding reports
                                     </Typography>
                                 </Box>
                             </TableCell>
@@ -2984,7 +3185,7 @@ const HoldingTable = ({
                                                         },
                                                     }}
                                                 >
-                                                    <img src={book} alt="view-report" />
+                                                    <img src={report} alt="view-report" />
                                                 </IconButton>
                                             </Tooltip>
                                         ) : (
@@ -3045,24 +3246,44 @@ const HoldingTable = ({
                                     </TableCell>
                                     <TableCell align="center" sx={{ py: 1.5 }}>
                                         <Tooltip title="Locked - Requires Save Changes">
-                                            <Checkbox
+                                            <IconButton
                                                 size="small"
-                                                checked={isLocked}
-                                                onChange={() => onLockedToggle(item.id)}
+                                                onClick={() => onLockedToggle(item.id)}
                                                 disabled={isDelete}
-                                                sx={{ padding: '6px' }}
-                                            />
+                                                sx={{
+                                                    padding: '6px',
+                                                }}
+                                            >
+                                                <img
+                                                    src={locked}
+                                                    alt="locked"
+                                                    style={{
+                                                        width: '20px',
+                                                        height: '20px',
+                                                    }}
+                                                />
+                                            </IconButton>
                                         </Tooltip>
                                     </TableCell>
                                     <TableCell align="center" sx={{ py: 1.5 }}>
-                                        <Tooltip title="Delete - Updates status to 'DELETED' and rme_completed=true on Save Changes">
-                                            <Checkbox
+                                        <Tooltip title="Discard - Updates status to 'DELETED' and rme_completed=true on Save Changes">
+                                            <IconButton
                                                 size="small"
-                                                checked={isDelete}
-                                                onChange={() => onDeleteToggle(item.id)}
+                                                onClick={() => onDeleteToggle(item.id)}
                                                 disabled={isLocked}
-                                                sx={{ padding: '6px' }}
-                                            />
+                                                sx={{
+                                                    padding: '6px',
+                                                }}
+                                            >
+                                                <img
+                                                    src={discard}
+                                                    alt="discard"
+                                                    style={{
+                                                        width: '20px',
+                                                        height: '20px',
+                                                    }}
+                                                />
+                                            </IconButton>
                                         </Tooltip>
                                     </TableCell>
                                 </TableRow>
@@ -3165,7 +3386,7 @@ const FinalizedTable = ({
                 <TableBody>
                     {items.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                            <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
                                 <Box sx={{
                                     display: 'flex',
                                     flexDirection: 'column',
@@ -3182,7 +3403,7 @@ const FinalizedTable = ({
                                             fontWeight: 500,
                                         }}
                                     >
-                                        No records found
+                                        No finalized reports
                                     </Typography>
                                 </Box>
                             </TableCell>
