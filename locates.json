@@ -1,0 +1,26 @@
+[
+    {
+        "id": "1",
+        "scraped_at": "2026-01-19T13:49:17.285703Z",
+        "work_order_number": "14599",
+        "customer_name": "Eric & Noel A Clark",
+        "customer_address": "13822 113th Ave Ct E - Puyallup WA 98374",
+        "status": "Pending",
+        "priority_name": "EXCAVATOR",
+        "tech_name": "06 - Cris",
+        "scheduled_date": "01/19/2026 8:00 AM - 5:15 PM",
+        "created_date": "01/14/2026 5:40 AM",
+        "call_type": null,
+        "called_at": null,
+        "called_by": "",
+        "called_by_email": "",
+        "locates_called": false,
+        "time_remaining": "",
+        "timer_started": false,
+        "timer_expired": false,
+        "deletedBy": "Damon",
+        "deletedByEmail": "damon@company.com",
+        "deletedDate": "2026-01-14T14:30:00",
+        "isDeleted": true
+    }
+]
