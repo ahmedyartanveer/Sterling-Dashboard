@@ -2,9 +2,6 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.utils import timezone
-from datetime import timedelta, datetime
-from django.db.models import Q
-from django.core.paginator import Paginator
 from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
@@ -12,7 +9,7 @@ from django_filters import FilterSet
 from rest_framework.decorators import action
 from .models import WorkOrderToday, Locates
 from .serializers import WorkOrderTodaySerializer, LocatesSerializer
-
+import subprocess, os, sys
 
 class WorkOrderTodayFilter(FilterSet):
     class Meta:
@@ -60,18 +57,86 @@ class WorkOrderTodayFilter(FilterSet):
 
 class WorkOrderTodayViewSet(viewsets.ModelViewSet):
     """
-    A ViewSet for viewing and editing WorkOrderToday instances.
-    Provides automatic list, create, retrieve, update, and destroy actions.
+    ViewSet for WorkOrderToday.
+    Handles standard CRUD operations with automation triggers on specific status updates.
     """
     queryset = WorkOrderToday.objects.all()
     serializer_class = WorkOrderTodaySerializer
 
-    # Setup for filtering, searching, and ordering
+    # Filter, Search, and Ordering Configuration
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = WorkOrderTodayFilter
     search_fields = ['wo_number', 'full_address', 'technician', 'notes']
     ordering_fields = '__all__'
     ordering = ['-scheduled_date']
+    
+    def _run_automation_script(self, script_name, argument, new_status):
+        """
+        Helper method to execute external automation scripts.
+        Raises CalledProcessError if the script fails.
+        """
+        script_path = os.path.join(os.getcwd(), 'tasks', script_name)
+        
+        # Inject current working directory to PYTHONPATH to ensure imports work
+        env = os.environ.copy()
+        env["PYTHONPATH"] = os.getcwd()
+
+        return subprocess.run(
+            [sys.executable, script_path, str(argument), str(new_status)],
+            capture_output=True,
+            text=True,
+            check=True,
+            env=env
+        )
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        new_status = serializer.validated_data.get('status')
+        
+        # Map specific statuses to their corresponding automation scripts
+        automation_map = {
+            'LOCKED': 'run_locked_deleted_task.py',
+            'DELETED': 'run_locked_deleted_task.py'
+        }
+
+        # Check if automation is required for the new status
+        if (new_status in automation_map):
+            script_name = automation_map[new_status]
+            print(f"🔄 Starting automation: {script_name} for ID: {instance.id}")
+
+            try:
+                # Run the script before saving to the database
+                result = self._run_automation_script(script_name, instance.full_address, new_status)
+                print(f"✅ Automation Success: {result.stdout}")
+
+            except subprocess.CalledProcessError as e:
+                # Automation failed; abort the database update and return error
+                print(f"❌ Automation Failed: {e.stderr}")
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": f"Automation failed for status {new_status}. Database was NOT updated.",
+                        "details": e.stderr
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Only perform the database update if automation succeeded (or wasn't required)
+        self.perform_update(serializer)
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Work Order updated and automation completed successfully.",
+                "data": serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+    
 
     def create(self, request, *args, **kwargs):
         """

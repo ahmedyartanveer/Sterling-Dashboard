@@ -2,12 +2,11 @@
 Online RME Scraper
 Scrapes report links from the Online RME system.
 """
-import asyncio
-from typing import List, Dict
-from bs4 import BeautifulSoup
-
-from automation.scrapers.base_scraper import BaseScraper
-
+try:
+    from automation.scrapers.base_scraper import BaseScraper
+except:
+    from base_scraper import BaseScraper
+from automation.utils.address_helpers import extract_address_details
 
 class OnlineRMEScraper(BaseScraper):
     """
@@ -57,29 +56,6 @@ class OnlineRMEScraper(BaseScraper):
             print(f"❌ Error during authentication check: {e}")
             raise
     
-    def parse_address(self, full_address):
-        """
-        Parse full address into street number and street name.
-        
-        Args:
-            full_address: Complete address string
-            
-        Returns:
-            tuple: (street_number, street_name) or (None, None) if invalid
-        """
-        if not full_address:
-            return None, None
-        
-        parts = full_address.split(' ')
-        
-        if len(parts) < 2:
-            print(f"⚠️  Invalid address format: {full_address}")
-            return None, None
-        
-        street_number = parts[0]
-        street_name = parts[1]
-        
-        return street_number, street_name
     
     async def search_property(self, street_number, street_name):
         """
@@ -258,7 +234,7 @@ class OnlineRMEScraper(BaseScraper):
                     print(f"⏭️  Skipping item {index}: No address provided.")
                     continue
                 
-                street_number, street_name = self.parse_address(full_address)
+                street_number, street_name = extract_address_details(full_address)
                 if not street_number or not street_name:
                     continue
                 
