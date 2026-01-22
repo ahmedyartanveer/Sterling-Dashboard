@@ -67,6 +67,7 @@ const RED_COLOR = '#ef4444';
 const ORANGE_COLOR = '#ed6c02';
 const GRAY_COLOR = '#6b7280';
 const PURPLE_COLOR = '#8b5cf6';
+const CYAN_COLOR  = '#06b6d4';
 
 // Define the timezone for Pierce County, WA, USA (GMT-8)
 const TIMEZONE = 'America/Los_Angeles'; // Pacific Time (GMT-8)
@@ -327,6 +328,21 @@ const RMEReports = () => {
     const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
     const [currentPdfUrl, setCurrentPdfUrl] = useState('');
 
+    // Confirmation modals for actions
+    const [lockedConfirmModal, setLockedConfirmModal] = useState({
+        open: false,
+        itemId: null,
+        itemData: null,
+        section: null, // 'reportSubmitted' or 'holding'
+    });
+
+    const [discardConfirmModal, setDiscardConfirmModal] = useState({
+        open: false,
+        itemId: null,
+        itemData: null,
+        section: null, // 'reportSubmitted' or 'holding'
+    });
+
     // Snackbar
     const [snackbar, setSnackbar] = useState({
         open: false,
@@ -344,8 +360,6 @@ const RMEReports = () => {
         staleTime: 30000,
         refetchInterval: 60000,
     });
-
-    console.log('workOrders', workOrders);
 
     // Fetch only deleted work orders for history
     const { data: deletedWorkOrders = [] } = useQuery({
@@ -681,6 +695,22 @@ const RMEReports = () => {
         },
     });
 
+    const deleteReportMutation = useMutation({
+        mutationFn: async ({ id }) => {
+            const response = await axiosInstance.patch(`/work-orders-today/${id}/`, {
+                finalized_by: currentUser.name,
+                finalized_by_email: currentUser.email,
+                finalized_date: new Date().toISOString(),
+                rme_completed: true,
+                status: 'DELETED',
+            });
+            return response.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['rme-work-orders']);
+        },
+    });
+
     // Handle tech report checkbox toggle in Report Submitted table
     const handleTechReportToggle = async (id, isChecked) => {
         try {
@@ -695,21 +725,118 @@ const RMEReports = () => {
         }
     };
 
-    const handleLockedToggle = (id) => {
-        const newSet = new Set(lockedAction);
-        if (newSet.has(id)) {
-            newSet.delete(id);
-        } else {
-            newSet.add(id);
-            const waitToLockSet = new Set(waitToLockAction);
-            waitToLockSet.delete(id);
-            setWaitToLockAction(waitToLockSet);
+    // Handle locked action with confirmation
+    const handleLockedClick = (id, section, itemData) => {
+        setLockedConfirmModal({
+            open: true,
+            itemId: id,
+            itemData: itemData,
+            section: section,
+        });
+    };
 
-            const deleteSet = new Set(deleteAction);
-            deleteSet.delete(id);
-            setDeleteAction(deleteSet);
+    const confirmLockedAction = async () => {
+        const { itemId, section, itemData } = lockedConfirmModal;
+        
+        try {
+            if (section === 'reportSubmitted') {
+                // Execute lock immediately for Report Submitted table
+                await lockReportMutation.mutateAsync({
+                    id: itemId,
+                    reportId: `RME-${new Date().getFullYear()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+                });
+                
+                // Clear any related checkboxes
+                const waitToLockSet = new Set(waitToLockAction);
+                waitToLockSet.delete(itemId);
+                setWaitToLockAction(waitToLockSet);
+
+                const deleteSet = new Set(deleteAction);
+                deleteSet.delete(itemId);
+                setDeleteAction(deleteSet);
+
+                // Clear wait to lock details
+                if (waitToLockDetails[itemId]) {
+                    const newDetails = { ...waitToLockDetails };
+                    delete newDetails[itemId];
+                    setWaitToLockDetails(newDetails);
+                }
+
+                showSnackbar('Report locked successfully', 'success');
+            } else if (section === 'holding') {
+                // Execute lock immediately for Holding table
+                await lockReportMutation.mutateAsync({
+                    id: itemId,
+                    reportId: `RME-${new Date().getFullYear()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+                });
+                
+                // Clear any related checkboxes
+                const deleteSet = new Set(holdingDeleteAction);
+                deleteSet.delete(itemId);
+                setHoldingDeleteAction(deleteSet);
+
+                showSnackbar('Report locked successfully', 'success');
+            }
+        } catch (error) {
+            console.error('Error locking report:', error);
+            showSnackbar('Failed to lock report', 'error');
+        } finally {
+            setLockedConfirmModal({ open: false, itemId: null, itemData: null, section: null });
         }
-        setLockedAction(newSet);
+    };
+
+    // Handle discard action with confirmation
+    const handleDiscardClick = (id, section, itemData) => {
+        setDiscardConfirmModal({
+            open: true,
+            itemId: id,
+            itemData: itemData,
+            section: section,
+        });
+    };
+
+    const confirmDiscardAction = async () => {
+        const { itemId, section, itemData } = discardConfirmModal;
+        
+        try {
+            if (section === 'reportSubmitted') {
+                // Execute delete immediately for Report Submitted table
+                await deleteReportMutation.mutateAsync({ id: itemId });
+                
+                // Clear any related checkboxes
+                const lockedSet = new Set(lockedAction);
+                lockedSet.delete(itemId);
+                setLockedAction(lockedSet);
+
+                const waitToLockSet = new Set(waitToLockAction);
+                waitToLockSet.delete(itemId);
+                setWaitToLockAction(waitToLockSet);
+
+                // Clear wait to lock details
+                if (waitToLockDetails[itemId]) {
+                    const newDetails = { ...waitToLockDetails };
+                    delete newDetails[itemId];
+                    setWaitToLockDetails(newDetails);
+                }
+
+                showSnackbar('Report discarded successfully', 'success');
+            } else if (section === 'holding') {
+                // Execute delete immediately for Holding table
+                await deleteReportMutation.mutateAsync({ id: itemId });
+                
+                // Clear any related checkboxes
+                const lockedSet = new Set(holdingLockedAction);
+                lockedSet.delete(itemId);
+                setHoldingLockedAction(lockedSet);
+
+                showSnackbar('Report discarded successfully', 'success');
+            }
+        } catch (error) {
+            console.error('Error discarding report:', error);
+            showSnackbar('Failed to discard report', 'error');
+        } finally {
+            setDiscardConfirmModal({ open: false, itemId: null, itemData: null, section: null });
+        }
     };
 
     const handleWaitToLockToggle = (id) => {
@@ -735,30 +862,6 @@ const RMEReports = () => {
             }));
         }
         setWaitToLockAction(newSet);
-    };
-
-    const handleDeleteToggle = (id) => {
-        const newSet = new Set(deleteAction);
-        if (newSet.has(id)) {
-            newSet.delete(id);
-        } else {
-            newSet.add(id);
-            const lockedSet = new Set(lockedAction);
-            lockedSet.delete(id);
-            setLockedAction(lockedSet);
-
-            const waitToLockSet = new Set(waitToLockAction);
-            waitToLockSet.delete(id);
-            setWaitToLockAction(waitToLockSet);
-
-            // Clear wait to lock details
-            if (waitToLockSet.has(id)) {
-                const newDetails = { ...waitToLockDetails };
-                delete newDetails[id];
-                setWaitToLockDetails(newDetails);
-            }
-        }
-        setDeleteAction(newSet);
     };
 
     // Handle wait to lock details changes
@@ -913,18 +1016,14 @@ const RMEReports = () => {
         }
     };
 
-    // Handle save changes for Report Submitted table
+    // Handle save changes for Report Submitted table (only for Wait to Lock)
     const handleSaveReportSubmittedChanges = async () => {
         const selectedItems = reportSubmittedPageItems.filter(item =>
-            lockedAction.has(item.id) ||
-            waitToLockAction.has(item.id) ||
-            deleteAction.has(item.id)
+            waitToLockAction.has(item.id)
         );
 
         const actions = {
-            lockedAndCompleted: [],
             waitToLock: [],
-            deleteUpdates: [],
             invalidCombinations: []
         };
 
@@ -933,16 +1032,8 @@ const RMEReports = () => {
             const hasWaitToLock = waitToLockAction.has(item.id);
             const hasDelete = deleteAction.has(item.id);
 
-            // Check combination 1: Locked
-            if (hasLocked && !hasWaitToLock && !hasDelete) {
-                actions.lockedAndCompleted.push({
-                    id: item.id,
-                    reportId: `RME-${new Date().getFullYear()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-                    rawData: item.rawData,
-                });
-            }
-            // Check combination 2: Wait to Lock
-            else if (hasWaitToLock && !hasLocked && !hasDelete) {
+            // Only process Wait to Lock actions (Locked and Delete are handled immediately)
+            if (hasWaitToLock && !hasLocked && !hasDelete) {
                 const details = waitToLockDetails[item.id] || { reason: '', notes: '' };
                 if (details.reason) {
                     actions.waitToLock.push({
@@ -959,38 +1050,11 @@ const RMEReports = () => {
                     });
                 }
             }
-            // Check combination 3: Delete - Updates status to "DELETED" with user info
-            else if (hasDelete && !hasLocked && !hasWaitToLock) {
-                actions.deleteUpdates.push({
-                    id: item.id,
-                    rawData: item.rawData,
-                });
-            }
-            // Invalid combinations
-            else if ((hasLocked && (hasWaitToLock || hasDelete)) ||
-                (hasWaitToLock && hasDelete)) {
-                actions.invalidCombinations.push({
-                    id: item.id,
-                    address: item.address,
-                    error: 'Invalid checkbox combination. Please select only one action per row.'
-                });
-            }
         });
 
-        // Execute API calls
+        // Execute API calls for Wait to Lock
         try {
             let message = '';
-
-            // Process locked and completed
-            if (actions.lockedAndCompleted.length > 0) {
-                for (const action of actions.lockedAndCompleted) {
-                    await lockReportMutation.mutateAsync({
-                        id: action.id,
-                        reportId: action.reportId,
-                    });
-                }
-                message += `${actions.lockedAndCompleted.length} report(s) sent to Finalized as "LOCKED" by ${currentUser.name}. `;
-            }
 
             // Process wait to lock
             if (actions.waitToLock.length > 0) {
@@ -1004,23 +1068,6 @@ const RMEReports = () => {
                 message += `${actions.waitToLock.length} report(s) moved to Holding. `;
             }
 
-            // Process delete updates
-            if (actions.deleteUpdates.length > 0) {
-                const deletePromises = actions.deleteUpdates.map(({ id }) =>
-                    axiosInstance.patch(`/work-orders-today/${id}/`, {
-                        finalized_by: currentUser.name,
-                        finalized_by_email: currentUser.email,
-                        finalized_date: new Date().toISOString(),
-                        rme_completed: true,
-                        status: 'DELETED',
-                    })
-                );
-                await Promise.all(deletePromises);
-
-                queryClient.invalidateQueries(['rme-work-orders']);
-                message += `${actions.deleteUpdates.length} report(s) marked as "DELETED" by ${currentUser.name}. `;
-            }
-
             // Show errors for invalid combinations
             if (actions.invalidCombinations.length > 0) {
                 const invalidAddresses = actions.invalidCombinations.map(ic => ic.address).join(', ');
@@ -1029,75 +1076,16 @@ const RMEReports = () => {
             } else if (message) {
                 showSnackbar(message, 'success');
             } else {
-                showSnackbar('No changes to save', 'info');
+                showSnackbar('No Wait to Lock changes to save', 'info');
             }
 
             // Clear checkboxes after processing
-            setLockedAction(new Set());
             setWaitToLockAction(new Set());
-            setDeleteAction(new Set());
             setWaitToLockDetails({});
 
         } catch (error) {
             console.error('Save changes error:', error);
             showSnackbar('Failed to save changes', 'error');
-        }
-    };
-
-    // Handle save changes for stage 2
-    const handleSaveStage2Changes = async () => {
-        const lockedIds = Array.from(holdingLockedAction);
-        const deleteIds = Array.from(holdingDeleteAction);
-
-        const lockedItems = lockedIds.map(id => {
-            const item = holdingPageItems.find(r => r.id === id);
-            return item?.rawData;
-        }).filter(Boolean);
-
-        const deleteItems = deleteIds.map(id => {
-            const item = holdingPageItems.find(r => r.id === id);
-            return item?.rawData;
-        }).filter(Boolean);
-
-        try {
-            let message = '';
-
-            // Process locked items
-            if (lockedItems.length > 0) {
-                await bulkLockMutation.mutateAsync(lockedItems);
-                message += `${lockedItems.length} report(s) sent to Finalized as "LOCKED". `;
-            }
-
-            // Process delete items
-            if (deleteItems.length > 0) {
-                const deletePromises = deleteItems.map(item =>
-                    axiosInstance.patch(`/work-orders-today/${item.id}/`, {
-                        finalized_by: currentUser.name,
-                        finalized_by_email: currentUser.email,
-                        finalized_date: new Date().toISOString(),
-                        rme_completed: true,
-                        status: 'DELETED',
-                    })
-                );
-                await Promise.all(deletePromises);
-
-                queryClient.invalidateQueries(['rme-work-orders']);
-                message += `${deleteItems.length} report(s) marked as "DELETED" by ${currentUser.name}. `;
-            }
-
-            if (message) {
-                showSnackbar(message, 'success');
-            } else {
-                showSnackbar('No changes to save', 'info');
-            }
-
-            // Clear checkboxes after processing
-            setHoldingLockedAction(new Set());
-            setHoldingDeleteAction(new Set());
-
-        } catch (error) {
-            console.error('Save stage 2 error:', error);
-            showSnackbar('Failed to save stage 2 changes', 'error');
         }
     };
 
@@ -1225,7 +1213,7 @@ const RMEReports = () => {
             {/* Report Submitted Table */}
             <Section
                 title="Stage 2: Report Submitted"
-                color={ORANGE_COLOR}
+                color={CYAN_COLOR}
                 count={filteredReportSubmitted.length}
                 selectedCount={selectedReportSubmitted.size}
                 onDelete={() => {
@@ -1248,11 +1236,7 @@ const RMEReports = () => {
                             size="small"
                             onClick={handleSaveReportSubmittedChanges}
                             startIcon={<Save size={14} />}
-                            disabled={
-                                lockedAction.size === 0 &&
-                                waitToLockAction.size === 0 &&
-                                deleteAction.size === 0
-                            }
+                            disabled={waitToLockAction.size === 0}
                             sx={{
                                 textTransform: 'none',
                                 fontSize: '0.75rem',
@@ -1274,20 +1258,16 @@ const RMEReports = () => {
                     selected={selectedReportSubmitted}
                     onToggleSelect={(id) => toggleSelection(setSelectedReportSubmitted, id)}
                     onToggleAll={() => setSelectedReportSubmitted(toggleAllSelection(selectedReportSubmitted, filteredReportSubmitted, reportSubmittedPageItems))}
-                    lockedAction={lockedAction}
-                    onLockedToggle={handleLockedToggle}
+                    onLockedClick={(id, itemData) => handleLockedClick(id, 'reportSubmitted', itemData)}
                     waitToLockAction={waitToLockAction}
                     onWaitToLockToggle={handleWaitToLockToggle}
-                    deleteAction={deleteAction}
-                    onDeleteToggle={handleDeleteToggle}
+                    onDiscardClick={(id, itemData) => handleDiscardClick(id, 'reportSubmitted', itemData)}
                     waitToLockDetails={waitToLockDetails}
                     onWaitToLockReasonChange={handleWaitToLockReasonChange}
                     onWaitToLockNotesChange={handleWaitToLockNotesChange}
                     onSaveChanges={handleSaveReportSubmittedChanges}
-                    lockedActionSize={lockedAction.size}
                     waitToLockActionSize={waitToLockAction.size}
-                    deleteActionSize={deleteAction.size}
-                    color={ORANGE_COLOR}
+                    color={CYAN_COLOR}
                     totalCount={filteredReportSubmitted.length}
                     page={pageReportSubmitted}
                     rowsPerPage={rowsPerPageReportSubmitted}
@@ -1318,26 +1298,6 @@ const RMEReports = () => {
                             onChange={setSearchHolding}
                             placeholder="Search holding..."
                         />
-                        <Button
-                            variant="contained"
-                            color="warning"
-                            size="small"
-                            onClick={handleSaveStage2Changes}
-                            startIcon={<Save size={14} />}
-                            disabled={holdingLockedAction.size === 0 && holdingDeleteAction.size === 0}
-                            sx={{
-                                textTransform: 'none',
-                                fontSize: '0.75rem',
-                                height: '30px',
-                                px: 1.5,
-                                bgcolor: ORANGE_COLOR,
-                                '&:hover': {
-                                    bgcolor: alpha(ORANGE_COLOR, 0.9),
-                                },
-                            }}
-                        >
-                            Save Changes
-                        </Button>
                     </Stack>
                 }
             >
@@ -1346,10 +1306,8 @@ const RMEReports = () => {
                     selected={selectedHolding}
                     onToggleSelect={(id) => toggleSelection(setSelectedHolding, id)}
                     onToggleAll={() => setSelectedHolding(toggleAllSelection(selectedHolding, filteredHoldingReports, holdingPageItems))}
-                    lockedAction={holdingLockedAction}
-                    onLockedToggle={(id) => toggleSelection(setHoldingLockedAction, id)}
-                    deleteAction={holdingDeleteAction}
-                    onDeleteToggle={(id) => toggleSelection(setHoldingDeleteAction, id)}
+                    onLockedClick={(id, itemData) => handleLockedClick(id, 'holding', itemData)}
+                    onDiscardClick={(id, itemData) => handleDiscardClick(id, 'holding', itemData)}
                     color={ORANGE_COLOR}
                     totalCount={filteredHoldingReports.length}
                     page={pageHolding}
@@ -1404,6 +1362,376 @@ const RMEReports = () => {
                 onClose={() => setPdfViewerOpen(false)}
                 pdfUrl={currentPdfUrl}
             />
+
+            {/* Locked Confirmation Modal */}
+            <Dialog
+                open={lockedConfirmModal.open}
+                onClose={() => setLockedConfirmModal({ ...lockedConfirmModal, open: false })}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: 'white',
+                        borderRadius: '6px',
+                        border: `1px solid ${alpha(GREEN_COLOR, 0.1)}`,
+                    }
+                }}
+            >
+                <DialogTitle sx={{
+                    borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.1)}`,
+                    pb: 1.5,
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: alpha(GREEN_COLOR, 0.1),
+                            color: GREEN_COLOR,
+                        }}>
+                            <img
+                                src={locked}
+                                alt="locked"
+                                style={{
+                                    width: '18px',
+                                    height: '18px',
+                                }}
+                            />
+                        </Box>
+                        <Box>
+                            <Typography variant="h6" sx={{
+                                color: TEXT_COLOR,
+                                fontSize: '0.95rem',
+                                fontWeight: 600,
+                                lineHeight: 1.2,
+                            }}>
+                                Confirm Lock Action
+                            </Typography>
+                            <Typography variant="caption" sx={{
+                                color: GRAY_COLOR,
+                                fontSize: '0.75rem',
+                                fontWeight: 400,
+                            }}>
+                                Lock report and move to Finalized
+                            </Typography>
+                        </Box>
+                    </Box>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2.5, pb: 1.5 }}>
+                    <Typography
+                        variant="body2"
+                        sx={{
+                            color: TEXT_COLOR,
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                            mb: 2,
+                        }}
+                    >
+                        Are you sure you want to lock this report and move it to Finalized?
+                    </Typography>
+                    {lockedConfirmModal.itemData && (
+                        <Box sx={{
+                            p: 1.5,
+                            borderRadius: '6px',
+                            backgroundColor: alpha(GREEN_COLOR, 0.05),
+                            border: `1px solid ${alpha(GREEN_COLOR, 0.1)}`,
+                            mb: 2,
+                        }}>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: TEXT_COLOR,
+                                    fontSize: '0.85rem',
+                                    fontWeight: 500,
+                                    mb: 0.5,
+                                }}
+                            >
+                                {lockedConfirmModal.itemData.street}
+                            </Typography>
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: GRAY_COLOR,
+                                    fontSize: '0.8rem',
+                                    fontWeight: 400,
+                                }}
+                            >
+                                {lockedConfirmModal.itemData.city}, {lockedConfirmModal.itemData.state} {lockedConfirmModal.itemData.zip}
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                                <Typography variant="caption" sx={{
+                                    color: GRAY_COLOR,
+                                    fontSize: '0.75rem',
+                                }}>
+                                    Technician:
+                                </Typography>
+                                <Typography variant="caption" sx={{
+                                    color: TEXT_COLOR,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500,
+                                }}>
+                                    {lockedConfirmModal.itemData.technician}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    )}
+                    <Box sx={{
+                        p: 1.5,
+                        borderRadius: '6px',
+                        backgroundColor: alpha(GREEN_COLOR, 0.05),
+                        border: `1px solid ${alpha(GREEN_COLOR, 0.1)}`,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 1.5,
+                    }}>
+                        <AlertCircle size={18} color={GREEN_COLOR} />
+                        <Box>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: GREEN_COLOR,
+                                    fontSize: '0.85rem',
+                                    fontWeight: 500,
+                                    mb: 0.5,
+                                }}
+                            >
+                                Action will be executed immediately
+                            </Typography>
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: TEXT_COLOR,
+                                    fontSize: '0.8rem',
+                                    fontWeight: 400,
+                                }}
+                            >
+                                This report will be moved to the Finalized section with status "LOCKED".
+                            </Typography>
+                        </Box>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, pt: 1.5 }}>
+                    <Button
+                        onClick={() => setLockedConfirmModal({ ...lockedConfirmModal, open: false })}
+                        sx={{
+                            textTransform: 'none',
+                            color: TEXT_COLOR,
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                            px: 2,
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={confirmLockedAction}
+                        variant="contained"
+                        color="success"
+                        sx={{
+                            textTransform: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 500,
+                            px: 2,
+                            bgcolor: GREEN_COLOR,
+                            boxShadow: 'none',
+                            '&:hover': {
+                                bgcolor: alpha(GREEN_COLOR, 0.9),
+                                boxShadow: 'none',
+                            },
+                        }}
+                    >
+                        Lock Report
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Discard Confirmation Modal */}
+            <Dialog
+                open={discardConfirmModal.open}
+                onClose={() => setDiscardConfirmModal({ ...discardConfirmModal, open: false })}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: 'white',
+                        borderRadius: '6px',
+                        border: `1px solid ${alpha(RED_COLOR, 0.1)}`,
+                    }
+                }}
+            >
+                <DialogTitle sx={{
+                    borderBottom: `1px solid ${alpha(RED_COLOR, 0.1)}`,
+                    pb: 1.5,
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: alpha(RED_COLOR, 0.1),
+                            color: RED_COLOR,
+                        }}>
+                            <img
+                                src={discard}
+                                alt="discard"
+                                style={{
+                                    width: '18px',
+                                    height: '18px',
+                                }}
+                            />
+                        </Box>
+                        <Box>
+                            <Typography variant="h6" sx={{
+                                color: TEXT_COLOR,
+                                fontSize: '0.95rem',
+                                fontWeight: 600,
+                                lineHeight: 1.2,
+                            }}>
+                                Confirm Discard Action
+                            </Typography>
+                            <Typography variant="caption" sx={{
+                                color: GRAY_COLOR,
+                                fontSize: '0.75rem',
+                                fontWeight: 400,
+                            }}>
+                                Discard report and move to Finalized as "DELETED"
+                            </Typography>
+                        </Box>
+                    </Box>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2.5, pb: 1.5 }}>
+                    <Typography
+                        variant="body2"
+                        sx={{
+                            color: TEXT_COLOR,
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                            mb: 2,
+                        }}
+                    >
+                        Are you sure you want to discard this report and mark it as "DELETED"?
+                    </Typography>
+                    {discardConfirmModal.itemData && (
+                        <Box sx={{
+                            p: 1.5,
+                            borderRadius: '6px',
+                            backgroundColor: alpha(RED_COLOR, 0.05),
+                            border: `1px solid ${alpha(RED_COLOR, 0.1)}`,
+                            mb: 2,
+                        }}>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: TEXT_COLOR,
+                                    fontSize: '0.85rem',
+                                    fontWeight: 500,
+                                    mb: 0.5,
+                                }}
+                            >
+                                {discardConfirmModal.itemData.street}
+                            </Typography>
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: GRAY_COLOR,
+                                    fontSize: '0.8rem',
+                                    fontWeight: 400,
+                                }}
+                            >
+                                {discardConfirmModal.itemData.city}, {discardConfirmModal.itemData.state} {discardConfirmModal.itemData.zip}
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                                <Typography variant="caption" sx={{
+                                    color: GRAY_COLOR,
+                                    fontSize: '0.75rem',
+                                }}>
+                                    Technician:
+                                </Typography>
+                                <Typography variant="caption" sx={{
+                                    color: TEXT_COLOR,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500,
+                                }}>
+                                    {discardConfirmModal.itemData.technician}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    )}
+                    <Box sx={{
+                        p: 1.5,
+                        borderRadius: '6px',
+                        backgroundColor: alpha(RED_COLOR, 0.05),
+                        border: `1px solid ${alpha(RED_COLOR, 0.1)}`,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 1.5,
+                    }}>
+                        <AlertTriangle size={18} color={RED_COLOR} />
+                        <Box>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: RED_COLOR,
+                                    fontSize: '0.85rem',
+                                    fontWeight: 500,
+                                    mb: 0.5,
+                                }}
+                            >
+                                Action will be executed immediately
+                            </Typography>
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: TEXT_COLOR,
+                                    fontSize: '0.8rem',
+                                    fontWeight: 400,
+                                }}
+                            >
+                                This report will be moved to the Finalized section with status "DELETED".
+                            </Typography>
+                        </Box>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, pt: 1.5 }}>
+                    <Button
+                        onClick={() => setDiscardConfirmModal({ ...discardConfirmModal, open: false })}
+                        sx={{
+                            textTransform: 'none',
+                            color: TEXT_COLOR,
+                            fontSize: '0.85rem',
+                            fontWeight: 400,
+                            px: 2,
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={confirmDiscardAction}
+                        variant="contained"
+                        color="error"
+                        sx={{
+                            textTransform: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 500,
+                            px: 2,
+                            bgcolor: RED_COLOR,
+                            boxShadow: 'none',
+                            '&:hover': {
+                                bgcolor: alpha(RED_COLOR, 0.9),
+                                boxShadow: 'none',
+                            },
+                        }}
+                    >
+                        Discard Report
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* History Modal */}
             <Modal
@@ -2645,19 +2973,15 @@ const ReportSubmittedTable = ({
     selected,
     onToggleSelect,
     onToggleAll,
-    lockedAction,
-    onLockedToggle,
+    onLockedClick,
     waitToLockAction,
     onWaitToLockToggle,
-    deleteAction,
-    onDeleteToggle,
+    onDiscardClick,
     waitToLockDetails,
     onWaitToLockReasonChange,
     onWaitToLockNotesChange,
     onSaveChanges,
-    lockedActionSize,
     waitToLockActionSize,
-    deleteActionSize,
     color,
     totalCount,
     page,
@@ -2746,9 +3070,7 @@ const ReportSubmittedTable = ({
                             items.map((item) => {
                                 const isSelected = selected.has(item.id);
                                 const isTechReportSubmitted = item.techReportSubmitted;
-                                const isLocked = lockedAction.has(item.id);
                                 const isWaitToLock = waitToLockAction.has(item.id);
-                                const isDelete = deleteAction.has(item.id);
                                 const details = waitToLockDetails[item.id] || { reason: '', notes: '' };
 
                                 return (
@@ -2870,13 +3192,16 @@ const ReportSubmittedTable = ({
                                                 )}
                                             </TableCell>
                                             <TableCell align="center" sx={{ py: 1.5 }}>
-                                                <Tooltip title="Locked - Requires Save Changes">
+                                                <Tooltip title="Click to lock this report">
                                                     <IconButton
                                                         size="small"
-                                                        onClick={() => onLockedToggle(item.id)}
-                                                        disabled={isWaitToLock || isDelete}
+                                                        onClick={() => onLockedClick(item.id, item)}
+                                                        disabled={isWaitToLock}
                                                         sx={{
                                                             padding: '6px',
+                                                            '&:hover': {
+                                                                backgroundColor: alpha(GREEN_COLOR, 0.1),
+                                                            },
                                                         }}
                                                     >
                                                         <img
@@ -2896,7 +3221,6 @@ const ReportSubmittedTable = ({
                                                         size="small"
                                                         checked={isWaitToLock}
                                                         onChange={() => onWaitToLockToggle(item.id)}
-                                                        disabled={isLocked || isDelete}
                                                         sx={{
                                                             padding: '6px',
                                                             color: isTechReportSubmitted ? 'inherit' : alpha(TEXT_COLOR, 0.3),
@@ -2908,13 +3232,16 @@ const ReportSubmittedTable = ({
                                                 </Tooltip>
                                             </TableCell>
                                             <TableCell align="center" sx={{ py: 1.5 }}>
-                                                <Tooltip title="Discard - Updates status to 'DELETED' on Save Changes">
+                                                <Tooltip title="Click to discard this report">
                                                     <IconButton
                                                         size="small"
-                                                        onClick={() => onDeleteToggle(item.id)}
-                                                        disabled={isLocked || isWaitToLock}
+                                                        onClick={() => onDiscardClick(item.id, item)}
+                                                        disabled={isWaitToLock}
                                                         sx={{
                                                             padding: '6px',
+                                                            '&:hover': {
+                                                                backgroundColor: alpha(RED_COLOR, 0.1),
+                                                            },
                                                         }}
                                                     >
                                                         <img
@@ -2969,11 +3296,7 @@ const ReportSubmittedTable = ({
                                                                 color="warning"
                                                                 size="small"
                                                                 onClick={onSaveChanges}
-                                                                disabled={
-                                                                    lockedActionSize === 0 &&
-                                                                    waitToLockActionSize === 0 &&
-                                                                    deleteActionSize === 0
-                                                                }
+                                                                disabled={waitToLockActionSize === 0}
                                                                 startIcon={<Save size={14} />}
                                                                 sx={{
                                                                     textTransform: 'none',
@@ -2985,7 +3308,7 @@ const ReportSubmittedTable = ({
                                                                     },
                                                                 }}
                                                             >
-                                                                Save Changes
+                                                                Save Wait to Lock
                                                             </Button>
                                                         </Box>
                                                     </Box>
@@ -3038,10 +3361,8 @@ const HoldingTable = ({
     selected,
     onToggleSelect,
     onToggleAll,
-    lockedAction,
-    onLockedToggle,
-    deleteAction,
-    onDeleteToggle,
+    onLockedClick,
+    onDiscardClick,
     color,
     totalCount,
     page,
@@ -3128,8 +3449,6 @@ const HoldingTable = ({
                     ) : (
                         items.map((item) => {
                             const isSelected = selected.has(item.id);
-                            const isLocked = lockedAction.has(item.id);
-                            const isDelete = deleteAction.has(item.id);
 
                             return (
                                 <TableRow
@@ -3282,13 +3601,15 @@ const HoldingTable = ({
                                         </Box>
                                     </TableCell>
                                     <TableCell align="center" sx={{ py: 1.5 }}>
-                                        <Tooltip title="Locked - Requires Save Changes">
+                                        <Tooltip title="Click to lock this report">
                                             <IconButton
                                                 size="small"
-                                                onClick={() => onLockedToggle(item.id)}
-                                                disabled={isDelete}
+                                                onClick={() => onLockedClick(item.id, item)}
                                                 sx={{
                                                     padding: '6px',
+                                                    '&:hover': {
+                                                        backgroundColor: alpha(GREEN_COLOR, 0.1),
+                                                    },
                                                 }}
                                             >
                                                 <img
@@ -3303,13 +3624,15 @@ const HoldingTable = ({
                                         </Tooltip>
                                     </TableCell>
                                     <TableCell align="center" sx={{ py: 1.5 }}>
-                                        <Tooltip title="Discard - Updates status to 'DELETED' and rme_completed=true on Save Changes">
+                                        <Tooltip title="Click to discard this report">
                                             <IconButton
                                                 size="small"
-                                                onClick={() => onDeleteToggle(item.id)}
-                                                disabled={isLocked}
+                                                onClick={() => onDiscardClick(item.id, item)}
                                                 sx={{
                                                     padding: '6px',
+                                                    '&:hover': {
+                                                        backgroundColor: alpha(RED_COLOR, 0.1),
+                                                    },
                                                 }}
                                             >
                                                 <img
