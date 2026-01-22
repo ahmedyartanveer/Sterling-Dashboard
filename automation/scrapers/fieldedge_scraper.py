@@ -45,12 +45,12 @@ class FieldEdgeScraper(BaseScraper):
             
             if await status_button.count() > 0:
                 await status_button.click()
-                print(f"✅ Selected status: {status_name}")
+                print(f"Selected status: {status_name}")
             else:
-                print(f"⚠️  Status button '{status_name}' not found.")
+                print(f"Status button '{status_name}' not found.")
                 
         except Exception as e:
-            print(f"❌ Error selecting status '{status_name}': {e}")
+            print(f"Error selecting status '{status_name}': {e}")
     
     async def select_task_filter(self, task_name):
         """
@@ -76,14 +76,14 @@ class FieldEdgeScraper(BaseScraper):
                 task_label = self.page.locator(task_label_xpath)
                 if await task_label.count() > 0:
                     await task_label.click()
-                    print(f"✅ Selected task: {task_name}")
+                    print(f"Selected task: {task_name}")
                 else:
-                    print(f"⚠️  Task option '{task_name}' not found in dropdown.")
+                    print(f"Task option '{task_name}' not found in dropdown.")
             else:
-                print("⚠️  Task dropdown button not found.")
+                print("Task dropdown button not found.")
                 
         except Exception as e:
-            print(f"❌ Error selecting task filter: {e}")
+            print(f"Error selecting task filter: {e}")
     
     async def set_date_filter(self, start_date, end_date):
         """
@@ -112,10 +112,10 @@ class FieldEdgeScraper(BaseScraper):
             await end_input.fill('')
             await end_input.type(end_date)
             
-            print(f"✅ Date filter set: {start_date} to {end_date}")
+            print(f"Date filter set: {start_date} to {end_date}")
             
         except Exception as e:
-            print(f"❌ Error setting date filter: {e}")
+            print(f"Error setting date filter: {e}")
     
     async def apply_filters(self):
         """Apply all selected filters."""
@@ -124,13 +124,13 @@ class FieldEdgeScraper(BaseScraper):
             
             if await apply_button.count() > 0:
                 await apply_button.click()
-                print("✅ Filters applied.")
+                print("Filters applied.")
                 await self.page.wait_for_timeout(2000)
             else:
-                print("⚠️  Apply button not found.")
+                print("Apply button not found.")
                 
         except Exception as e:
-            print(f"❌ Error applying filters: {e}")
+            print(f"Error applying filters: {e}")
     
     async def scrape_work_orders(self):
         """
@@ -148,7 +148,7 @@ class FieldEdgeScraper(BaseScraper):
                 timeout=60000
             )
         except Exception as e:
-            print(f"❌ Timeout waiting for rows: {e}")
+            print(f"Timeout waiting for rows: {e}")
             return {'rows': []}
         
         try:
@@ -196,11 +196,11 @@ class FieldEdgeScraper(BaseScraper):
             }""")
             
             row_count = len(scraped_data.get('rows', []))
-            print(f"✅ Scraped {row_count} work order(s).")
+            print(f"Scraped {row_count} work order(s).")
             return scraped_data
             
         except Exception as e:
-            print(f"❌ Error during page evaluation: {e}")
+            print(f"Error during page evaluation: {e}")
             return {'rows': []}
     
     async def get_work_order_status(self, work_order_number):
@@ -244,7 +244,7 @@ class FieldEdgeScraper(BaseScraper):
             return None
             
         except Exception as e:
-            print(f"❌ Failed to get status for work order '{work_order_number}': {e}")
+            print(f"Failed to get status for work order '{work_order_number}': {e}")
             return None
     
     async def run(self):
@@ -262,7 +262,7 @@ class FieldEdgeScraper(BaseScraper):
             if url:
                 await self.page.goto(url, wait_until='domcontentloaded')
             else:
-                print("❌ No URL found in rules configuration.")
+                print("No URL found in rules configuration.")
                 return None
             
             # Login if necessary
@@ -278,7 +278,7 @@ class FieldEdgeScraper(BaseScraper):
                     timeout=60000
                 )
             except Exception as e:
-                print(f"⚠️  Task dropdown not immediately visible: {e}")
+                print(f"Task dropdown not immediately visible: {e}")
             
             # Apply filters
             status_name = self.rules.get('status_name', "Assigned")
@@ -316,7 +316,7 @@ class FieldEdgeScraper(BaseScraper):
             return result
             
         except Exception as e:
-            print(f"❌ Critical error in FieldEdge scraper: {e}")
+            print(f"Critical error in FieldEdge scraper: {e}")
             return None
             
         finally:

@@ -32,7 +32,7 @@ class WorkOrdersScraper(BaseScraper):
                 timeout=60000
             )
         except Exception as e:
-            print(f"❌ Error waiting for table rows: {e}")
+            print(f"Error waiting for table rows: {e}")
             return {'rows': []}
         
         try:
@@ -79,11 +79,11 @@ class WorkOrdersScraper(BaseScraper):
             }""")
             
             row_count = len(scraped_data.get('rows', []))
-            print(f"✅ Scraped {row_count} work order(s) from table.")
+            print(f"Scraped {row_count} work order(s) from table.")
             return scraped_data
             
         except Exception as e:
-            print(f"❌ Error during table scraping: {e}")
+            print(f"Error during table scraping: {e}")
             return {'rows': []}
     
     async def scrape_address_from_page(self, page):
@@ -103,7 +103,7 @@ class WorkOrdersScraper(BaseScraper):
                 timeout=60000
             )
         except Exception as e:
-            print(f"❌ Error waiting for address elements: {e}")
+            print(f"Error waiting for address elements: {e}")
             return None
         
         try:
@@ -121,7 +121,7 @@ class WorkOrdersScraper(BaseScraper):
             return full_address
             
         except Exception as e:
-            print(f"❌ Error extracting address: {e}")
+            print(f"Error extracting address: {e}")
             return None
     
     async def fetch_addresses_for_work_orders(self, work_orders):
@@ -149,13 +149,13 @@ class WorkOrdersScraper(BaseScraper):
                 # Only process Complete work orders with retry limit
                 if not wo_number or status != "Complete" or retry_count >= 2:
                     if wo_number and status != "Complete":
-                        print(f"⏭️  Skipping work order {wo_number}: Status is '{status}'")
+                        print(f"⏭Skipping work order {wo_number}: Status is '{status}'")
                     elif retry_count >= 2:
-                        print(f"⏭️  Skipping work order {wo_number}: Retry limit reached")
+                        print(f"Skipping work order {wo_number}: Retry limit reached")
                     continue
                 
                 if not base_xpath_config:
-                    print("❌ No XPath configured for opening work orders.")
+                    print("No XPath configured for opening work orders.")
                     continue
                 
                 # Prepare XPath with work order number
@@ -179,13 +179,13 @@ class WorkOrdersScraper(BaseScraper):
                     
                     if address:
                         work_order['full_address'] = address
-                        print(f"✅ {wo_number}: {address}")
+                        print(f"{wo_number}: {address}")
                         result.append(work_order)
                     else:
                         raise Exception("Address not found")
                 
                 except Exception as e:
-                    print(f"⚠️  Failed to scrape {wo_number}: {e}")
+                    print(f"Failed to scrape {wo_number}: {e}")
                     work_order['try_later'] = retry_count + 1
                     work_orders.append(work_order)
                 
@@ -196,7 +196,7 @@ class WorkOrdersScraper(BaseScraper):
                         pass
             
             except Exception as e:
-                print(f"❌ Error processing work order {wo_number}: {e}")
+                print(f"Error processing work order {wo_number}: {e}")
                 work_order['try_later'] = work_order.get("try_later", 0) + 1
                 work_orders.append(work_order)
         
@@ -234,7 +234,7 @@ class WorkOrdersScraper(BaseScraper):
                     timeout=600000
                 )
             except Exception as e:
-                print(f"❌ Error waiting for table: {e}")
+                print(f"Error waiting for table: {e}")
                 return None
             
             # Apply filters
@@ -252,7 +252,7 @@ class WorkOrdersScraper(BaseScraper):
             return work_orders_with_addresses
             
         except Exception as e:
-            print(f"❌ Scraping error: {e}")
+            print(f"Scraping error: {e}")
             return None
             
         finally:

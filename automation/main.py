@@ -20,14 +20,14 @@ async def run_fieldedge_scraper():
         
         if data and data.get('workOrders'):
             if scraper.insert_locates(data):
-                print("✅ FieldEdge data inserted successfully.")
+                print("FieldEdge data inserted successfully.")
             else:
-                print("❌ Failed to insert FieldEdge data.")
+                print("Failed to insert FieldEdge data.")
         else:
-            print("⚠️  No FieldEdge data scraped.")
+            print("No FieldEdge data scraped.")
             
     except Exception as e:
-        print(f"❌ Error during FieldEdge execution: {e}")
+        print(f"Error during FieldEdge execution: {e}")
     finally:
         if scraper:
             del scraper
@@ -44,12 +44,12 @@ async def run_work_orders_scraper():
         
         if work_orders_data:
             scraper.insert_work_order_today(work_orders_data)
-            print("✅ WorkOrders data inserted successfully.")
+            print("WorkOrders data inserted successfully.")
         else:
-            print("⚠️  No WorkOrders data found today.")
+            print("No WorkOrders data found today.")
             
     except Exception as e:
-        print(f"❌ Error during WorkOrders execution: {e}")
+        print(f"Error during WorkOrders execution: {e}")
     finally:
         if scraper:
             try:
@@ -75,7 +75,7 @@ async def run_online_rme_scraper():
         )
         
         record_count = len(work_orders_missing_urls) if work_orders_missing_urls else 0
-        print(f"📋 RME records to process: {record_count}")
+        print(f"RME records to process: {record_count}")
         
         if work_orders_missing_urls:
             updated_records = await scraper.run(work_orders_missing_urls)
@@ -90,12 +90,12 @@ async def run_online_rme_scraper():
                         record_id=record_id
                     )
             
-            print("✅ RME data patching completed.")
+            print("RME data patching completed.")
         else:
-            print("⚠️  No RME records found to update.")
+            print("No RME records found to update.")
             
     except Exception as e:
-        print(f"❌ Error during Online RME execution: {e}")
+        print(f"Error during Online RME execution: {e}")
     finally:
         if scraper:
             try:
@@ -120,16 +120,16 @@ def start_scraping():
     # Set appropriate event loop policy for Windows
     if sys.platform.startswith("win"):
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-        print("🖥️  OS: Windows detected. Event loop policy set to Proactor.\n")
+        print("OS: Windows detected. Event loop policy set to Proactor.\n")
     else:
-        print(f"🖥️  OS: {sys.platform} detected. Using default event loop.\n")
+        print(f"OS: {sys.platform} detected. Using default event loop.\n")
     
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n⚠️  Process interrupted by user.")
+        print("\nProcess interrupted by user.")
     except Exception as e:
-        print(f"\n❌ Critical error: {e}")
+        print(f"\nCritical error: {e}")
     finally:
         print("\n" + "="*50)
         print("PROCESS FINISHED")

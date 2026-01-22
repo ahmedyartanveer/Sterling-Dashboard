@@ -62,13 +62,13 @@ class BaseScraper:
             return {}
             
         except FileNotFoundError:
-            print(f"❌ Rules file not found at: {RULES_FILE_PATH}")
+            print(f"Rules file not found at: {RULES_FILE_PATH}")
             return {}
         except json.JSONDecodeError as e:
-            print(f"❌ Error parsing rules JSON: {e}")
+            print(f"Error parsing rules JSON: {e}")
             return {}
         except Exception as e:
-            print(f"❌ Unexpected error loading rules: {e}")
+            print(f"Unexpected error loading rules: {e}")
             return {}
     
     async def initialize(self):
@@ -88,10 +88,10 @@ class BaseScraper:
             self.context = await self.browser.new_context()
             self.page = await self.context.new_page()
             
-            print("✅ Browser initialized successfully.")
+            print("Browser initialized successfully.")
             
         except Exception as e:
-            print(f"❌ Failed to initialize browser: {e}")
+            print(f"Failed to initialize browser: {e}")
             raise
     
     async def login_fieldedge(self):
@@ -108,10 +108,10 @@ class BaseScraper:
             async with self.page.expect_navigation(wait_until='domcontentloaded'):
                 await self.page.click(login_button_xpath)
             
-            print("✅ FieldEdge login successful.")
+            print("FieldEdge login successful.")
             
         except Exception as e:
-            print(f"❌ FieldEdge login failed: {e}")
+            print(f"FieldEdge login failed: {e}")
             raise
     
     async def login_online_rme(self):
@@ -128,10 +128,10 @@ class BaseScraper:
             async with self.page.expect_navigation(wait_until='domcontentloaded'):
                 await self.page.click(login_button_xpath)
             
-            print("✅ Online RME login successful.")
+            print("Online RME login successful.")
             
         except Exception as e:
-            print(f"❌ Online RME login failed: {e}")
+            print(f"Online RME login failed: {e}")
             raise
     
     async def perform_actions_by_xpaths(self, name:str='', action_list:list=[], value:str=None):
@@ -151,7 +151,7 @@ class BaseScraper:
             xpath = item.get("xpath", "")
             
             if not xpath:
-                print("⚠️  Warning: Empty xpath in action configuration")
+                print("Warning: Empty xpath in action configuration")
                 continue
             
             element = self.page.locator(xpath)
@@ -162,25 +162,25 @@ class BaseScraper:
                 if element_count > 0:
                     if action == "click":
                         await element.click(timeout=5000)
-                        print(f"✅ Clicked element: {xpath}")
+                        print(f"Clicked element: {xpath}")
                     
                     elif action == "right_click":
                         await element.click(button="right", timeout=5000)
-                        print(f"✅ Right-clicked element: {xpath}")
+                        print(f"Right-clicked element: {xpath}")
                     
                     elif action == "input":
                         if value is not None:
                             await element.fill(str(value))
-                            print(f"✅ Input '{value}' into element: {xpath}")
+                            print(f"Input '{value}' into element: {xpath}")
                         else:
-                            print(f"⚠️  Warning: Action is 'input' but no value provided for: {xpath}")
+                            print(f"Warning: Action is 'input' but no value provided for: {xpath}")
                     
                     # Brief pause between actions for stability
                     await asyncio.sleep(3)
             except Exception as e:
-                print(f"❌ Action '{action}' failed for xpath '{xpath}': {e}")
+                print(f"Action '{action}' failed for xpath '{xpath}': {e}")
         
-        print(f"⚠️  Element not found or all actions failed for: {name or action_list}")
+        print(f"Element not found or all actions failed for: {name or action_list}")
     
     def insert_locates(self, locates_data):
         """
@@ -196,7 +196,7 @@ class BaseScraper:
             success = self.api_client.insert_locates(locates_data)
             return success
         except Exception as e:
-            print(f"❌ Database insertion error: {e}")
+            print(f"Database insertion error: {e}")
             return False
     
     def insert_work_order_today(self, work_orders):
@@ -232,14 +232,14 @@ class BaseScraper:
                 
                 # Insert via API
                 if self.api_client.insert_work_order_today(work_order):
-                    print(f"✅ Work order {work_order.get('wo_number', 'N/A')} inserted.")
+                    print(f"Work order {work_order.get('wo_number', 'N/A')} inserted.")
                 else:
-                    print(f"❌ Failed to insert work order {work_order.get('wo_number', 'N/A')}.")
+                    print(f"Failed to insert work order {work_order.get('wo_number', 'N/A')}.")
             
             return True
             
         except Exception as e:
-            print(f"❌ Database insertion error: {e}")
+            print(f"Database insertion error: {e}")
             return False
     
     async def cleanup(self):
@@ -249,6 +249,6 @@ class BaseScraper:
                 await self.browser.close()
             if self.playwright:
                 await self.playwright.stop()
-            print("✅ Browser cleanup completed.")
+            print("Browser cleanup completed.")
         except Exception as e:
-            print(f"⚠️  Error during cleanup: {e}")
+            print(f"Error during cleanup: {e}")

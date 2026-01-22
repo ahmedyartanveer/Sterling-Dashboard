@@ -14,7 +14,7 @@ def extract_address_details(full_address):
     parts = full_address.split(' ')
     
     if len(parts) < 2:
-        print(f"⚠️  Invalid address format: {full_address}")
+        print(f"Invalid address format: {full_address}")
         return None, None
     
     street_number = parts[0]

@@ -106,16 +106,16 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
         # Check if automation is required for the new status
         if (new_status in automation_map):
             script_name = automation_map[new_status]
-            print(f"🔄 Starting automation: {script_name} for ID: {instance.id}")
+            print(f"Starting automation: {script_name} for ID: {instance.id}")
 
             try:
                 # Run the script before saving to the database
                 result = self._run_automation_script(script_name, instance.full_address, new_status)
-                print(f"✅ Automation Success: {result.stdout}")
+                print(f"Automation Success: {result.stdout}")
 
             except subprocess.CalledProcessError as e:
                 # Automation failed; abort the database update and return error
-                print(f"❌ Automation Failed: {e.stderr}")
+                print(f"Automation Failed: {e.stderr}")
                 return Response(
                     {
                         "status": "failed",

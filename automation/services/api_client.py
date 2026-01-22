@@ -44,7 +44,7 @@ class APIClient:
         Returns:
             str: Authentication token or None if login fails
         """
-        print("🔐 Attempting API login...")
+        print("Attempting API login...")
         
         try:
             credentials = {
@@ -69,17 +69,17 @@ class APIClient:
             
             if response.status_code == 200:
                 token = response.json().get("token")
-                print("✅ API login successful.")
+                print("API login successful.")
                 return token
             else:
-                print(f"❌ Login failed with status {response.status_code}: {response.text}")
+                print(f"Login failed with status {response.status_code}: {response.text}")
                 return None
         
         except requests.Timeout:
-            print("❌ Login request timed out.")
+            print("Login request timed out.")
             return None
         except requests.RequestException as e:
-            print(f"❌ Login connection error: {e}")
+            print(f"Login connection error: {e}")
             return None
     
     def _ensure_authenticated(self):
@@ -91,11 +91,11 @@ class APIClient:
             bool: True if authenticated, False otherwise
         """
         if not self.token:
-            print("⚠️  Token missing, attempting re-authentication...")
+            print("Token missing, attempting re-authentication...")
             self.token = self._login()
             
             if not self.token:
-                print("❌ Could not obtain authentication token.")
+                print("Could not obtain authentication token.")
                 return False
         
         # Update authorization header
@@ -115,7 +115,7 @@ class APIClient:
         """
         # Success
         if response.status_code in [200, 201]:
-            print(f"✅ {method} request successful (Status: {response.status_code})")
+            print(f"{method} request successful (Status: {response.status_code})")
             
             # Return JSON if available, otherwise True
             try:
@@ -125,12 +125,12 @@ class APIClient:
         
         # Unauthorized - token expired
         elif response.status_code == 401:
-            print("⚠️  Token expired (401). Needs re-authentication.")
+            print("Token expired (401). Needs re-authentication.")
             return None
         
         # Other errors
         else:
-            print(f"❌ {method} request failed (Status: {response.status_code})")
+            print(f"{method} request failed (Status: {response.status_code})")
             print(f"Response: {response.text}")
             return None
     
@@ -148,10 +148,10 @@ class APIClient:
             return False
         
         if not locates_data.get("workOrders", []):
-            print("⚠️  No work orders to insert.")
+            print("No work orders to insert.")
             return False
         
-        print("📤 Sending locates data...")
+        print("Sending locates data...")
         print(locates_data)
         try:
             response = requests.post(
@@ -179,10 +179,10 @@ class APIClient:
             return bool(result)
         
         except requests.Timeout:
-            print("❌ Request timed out while inserting locates.")
+            print("Request timed out while inserting locates.")
             return False
         except requests.RequestException as e:
-            print(f"❌ Connection error during insert: {e}")
+            print(f"Connection error during insert: {e}")
             return False
     
     def insert_work_order_today(self, work_order_data):
@@ -224,7 +224,7 @@ class APIClient:
         if not self._ensure_authenticated():
             return None
         
-        print(f"📤 Sending {method} request to: {url}")
+        print(f"Sending {method} request to: {url}")
         
         try:
             response = requests.request(
@@ -256,8 +256,8 @@ class APIClient:
             return result
         
         except requests.Timeout:
-            print(f"❌ {method} request timed out.")
+            print(f"{method} request timed out.")
             return None
         except requests.RequestException as e:
-            print(f"❌ Connection error during {method}: {e}")
+            print(f"Connection error during {method}: {e}")
             return None

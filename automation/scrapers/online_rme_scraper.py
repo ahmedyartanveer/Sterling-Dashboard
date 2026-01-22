@@ -40,7 +40,7 @@ class OnlineRMEScraper(BaseScraper):
                 pass
             
             if not is_logged_in:
-                print("🔐 Not logged in. Redirecting to login page...")
+                print("Not logged in. Redirecting to login page...")
                 
                 login_url = self.rules.get('online_RME_url')
                 await self.page.goto(login_url, wait_until='domcontentloaded')
@@ -50,10 +50,10 @@ class OnlineRMEScraper(BaseScraper):
                 if self.page.url != search_url:
                     await self.page.goto(search_url, wait_until='networkidle')
             else:
-                print("✅ Already authenticated to Online RME.")
+                print("Already authenticated to Online RME.")
         
         except Exception as e:
-            print(f"❌ Error during authentication check: {e}")
+            print(f"Error during authentication check: {e}")
             raise
     
     
