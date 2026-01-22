@@ -50,6 +50,8 @@ class WorkOrderToday(models.Model):
     # Report Reference
     report_id = models.CharField(max_length=100, null=True, blank=True, help_text="Associated Report ID")
     
+    is_seen = models.BooleanField(default=False, help_text="Indicates if this work order has been seen")
+    
 
     def __str__(self):
         # Returns the WO number or ID as the string representation
@@ -58,7 +60,7 @@ class WorkOrderToday(models.Model):
     class Meta:
         verbose_name = "Work Order"
         verbose_name_plural = "Work Orders"
-        ordering = ['-scheduled_date']
+        ordering = ['-elapsed_time']
 
 
 class Locates(models.Model):
@@ -98,6 +100,8 @@ class Locates(models.Model):
     deleted_by_email = models.EmailField(max_length=100, blank=True, null=True)
     deleted_date = models.DateTimeField(blank=True, null=True)
     is_deleted = models.BooleanField(default=False)
+    
+    is_seen = models.BooleanField(default=False, help_text="Indicates if this locate record has been seen")
     
     scraped_at = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)

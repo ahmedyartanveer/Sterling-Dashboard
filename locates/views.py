@@ -8,7 +8,15 @@ from rest_framework import filters
 from django_filters import FilterSet
 from rest_framework.decorators import action
 from .models import WorkOrderToday, Locates
-from .serializers import WorkOrderTodaySerializer, LocatesSerializer
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
+from rest_framework import serializers
+from .serializers import (
+    WorkOrderTodaySerializer, 
+    LocatesSerializer, 
+    BulkUpdatePayloadSerializer
+)
 import subprocess, os, sys
 
 class WorkOrderTodayFilter(FilterSet):
@@ -360,3 +368,88 @@ class LocatesViewSet(viewsets.ModelViewSet):
                 'success': False,
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+class UnifiedBulkUpdateView(APIView):
+    """
+    API View to handle bulk updates for both WorkOrderToday and Locates models
+    in a single request.
+    
+    Method: PATCH
+    """
+
+    def patch(self, request, *args, **kwargs):
+        # 1. Validate the overall structure of the payload
+        payload_serializer = BulkUpdatePayloadSerializer(data=request.data)
+        if not payload_serializer.is_valid():
+            return Response(payload_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        validated_data = payload_serializer.validated_data
+        work_orders_data = validated_data.get('work_orders', [])
+        locates_data = validated_data.get('locates', [])
+
+        updated_work_orders = []
+        updated_locates = []
+        errors = {}
+
+        # Use atomic transaction to ensure data integrity. 
+        try:
+            with transaction.atomic():
+                
+                # --- Process Work Orders ---
+                for item in work_orders_data:
+                    wo_id = item.get('id')
+                    if not wo_id:
+                        continue # Skip items without ID
+                    
+                    # Fetch the instance
+                    instance = get_object_or_404(WorkOrderToday, pk=wo_id)
+                    
+                    # Initialize serializer with partial=True for PATCH behavior
+                    serializer = WorkOrderTodaySerializer(instance, data=item, partial=True)
+                    
+                    if serializer.is_valid():
+                        serializer.save()
+                        updated_work_orders.append(serializer.data)
+                    else:
+                        errors[f"work_order_{wo_id}"] = serializer.errors
+
+                # --- Process Locates ---
+                for item in locates_data:
+                    loc_id = item.get('id')
+                    if not loc_id:
+                        continue # Skip items without ID
+
+                    # Fetch the instance
+                    instance = get_object_or_404(Locates, pk=loc_id)
+                    
+                    # Initialize serializer with partial=True for PATCH behavior
+                    serializer = LocatesSerializer(instance, data=item, partial=True)
+                    
+                    if serializer.is_valid():
+                        serializer.save()
+                        updated_locates.append(serializer.data)
+                    else:
+                        errors[f"locate_{loc_id}"] = serializer.errors
+                if errors:
+                    raise serializers.ValidationError(errors)
+
+        except serializers.ValidationError as e:
+            return Response({"status": "error", "details": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            "status": "success",
+            "message": "Records updated successfully.",
+            "updated_counts": {
+                "work_orders": len(updated_work_orders),
+                "locates": len(updated_locates)
+            },
+            "data": {
+                "work_orders": updated_work_orders,
+                "locates": updated_locates
+            }
+        }, status=status.HTTP_200_OK)
