@@ -75,6 +75,8 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
         Helper method to execute external automation scripts.
         Raises CalledProcessError if the script fails.
         """
+        
+        print(">>> ABOUT TO START AUTOMATION <<<", flush=True)
         script_path = os.path.join(os.getcwd(), 'tasks', script_name)
         
         # Inject current working directory to PYTHONPATH to ensure imports work
@@ -83,11 +85,10 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
 
         return subprocess.run(
             [sys.executable, script_path, str(argument), str(new_status)],
-            capture_output=True,
-            text=True,
             check=True,
             env=env
         )
+
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)

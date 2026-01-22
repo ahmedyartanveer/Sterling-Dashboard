@@ -49,6 +49,7 @@ class WorkOrderToday(models.Model):
     
     # Report Reference
     report_id = models.CharField(max_length=100, null=True, blank=True, help_text="Associated Report ID")
+    
 
     def __str__(self):
         # Returns the WO number or ID as the string representation

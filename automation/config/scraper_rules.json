@@ -106,6 +106,7 @@
     "wait_rme_body": "input[name='txtStreetNumber']",
     "wait_rme_report_table": "//table[@id='ctl02_DataGridOMhistory']",
     "wait_work_history_table": "//table[@id='ctl02_DataGridOMhistory']",
-    "wait_iframe": "//iframe"
+    "wait_iframe": "//iframe",
+    "wait_lock_report_btn": "//input[@name='btnLock']"
   }
 ]

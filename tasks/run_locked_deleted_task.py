@@ -99,37 +99,50 @@ class OnlineRMELocedTask(OnlineRMEScraper):
                         
                         try:
                             click_item = None
-                            action_type = ""
 
                             if new_status == "LOCKED":
                                 # nth(11) is the 12th column (0-indexed)
                                 lock_item = columns.nth(11) 
                                 click_item = lock_item.locator('input')
-                                action_type = "LOCKED"
                                 log_info("Attempting to click lock input...")
+                                await click_item.click(timeout=5000)
+                                 # Wait for search form (timeout is acceptable here)
+                                wait_lock_report_btn = self.rules.get("wait_lock_report_btn")
+                                try:
+                                    log_info("Waiting for LOCK REPORT Button form...")
+                                    await self.page.wait_for_selector(wait_lock_report_btn, state='visible', timeout=30000)
+                                except Exception:
+                                    log_warning("Timeout waiting for LOCK REPORT Button form selector (continuing anyway)...")
+                                try:
+                                    element = self.page.locator(wait_lock_report_btn)
+                                    await element.wait_for(state="visible", timeout=10000)
+
+                                    await element.click()  # no_wait_after=False (default)
+
+                                    # ✅ wait until backend + page settle
+                                    await self.page.wait_for_load_state("networkidle", timeout=20000)
+
+                                    log_success("LOCK REPORT successfully.")
+                                    return True
+
+                                except Exception as e:
+                                    log_error(f"Error LOCK REPORT '{new_status}': {e}")
+                                    return False
 
                             elif new_status == "DELETED":
                                 # nth(0) is the 1st column
                                 deleted_item = columns.nth(0) 
                                 click_item = deleted_item.locator('a')
-                                action_type = "DELETED"
                                 log_info("Attempting to click Deleted...")
+                                await click_item.click(timeout=5000)
+                                log_info(f"Waiting 2 seconds for DELETED...")
+                                await self.page.wait_for_timeout(2000) 
+                                log_success(f"DELETED successfully.")
+                                return True
 
                             else:
                                 log_error(f"Invalid status provided: {new_status}")
                                 return False
-
-                            # Perform the click
-                            if click_item:
-                                await click_item.click(timeout=5000)
-                                
-                                # Determine appropriate log message
-                                log_info(f"Waiting 2 seconds for {action_type} to register...")
-                                await self.page.wait_for_timeout(2000) 
-                                
-                                log_success(f"Address {action_type} successfully.")
-                                return True
-
                         except Exception as click_err:
                             log_error(f"Error performing action '{new_status}': {click_err}")
                             return False
