@@ -13,24 +13,29 @@ import {
   IconButton,
   Divider,
   Stack,
-  alpha
+  alpha,
+  Button,
+  Tooltip
 } from '@mui/material';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   Bell,
   MapPin,
   Wrench,
   Clock,
   TrendingUp,
+  Check,
+  X
 } from 'lucide-react';
 import { useNotifications } from '../../hook/useNotifications';
 import { Helmet } from 'react-helmet-async';
+import axiosInstance from '../../api/axios';
+import { useNavigate } from 'react-router-dom';
 
 const TEXT_COLOR = '#0F1115';
 const BLUE_COLOR = '#1976d2';
 const GREEN_COLOR = '#10b981';
 const GRAY_COLOR = '#6b7280';
-
 
 const formatDate = (dateString) => {
   if (!dateString) return '—';
@@ -98,7 +103,26 @@ const parseDashboardAddress = (fullAddress) => {
 
 export default function Notifications() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { notifications: combinedData, isLoading, error, refetch } = useNotifications();
+
+  // Get user from localStorage or your auth context
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  // Get dashboard base path based on user role
+  const getDashboardBasePath = () => {
+    switch (user?.role?.toUpperCase()) {
+      case 'SUPER-ADMIN':
+      case 'SUPERADMIN':
+        return '/super-admin-dashboard';
+      case 'MANAGER':
+        return '/manager-dashboard';
+      case 'TECH':
+        return '/tech-dashboard';
+      default:
+        return '/';
+    }
+  };
 
   // Process and combine notifications - Show ALL notifications from last 30 days (not just latest 10)
   const notifications = useMemo(() => {
@@ -132,7 +156,8 @@ export default function Notifications() {
           icon: MapPin,
           color: BLUE_COLOR,
           rawData: locate,
-          is_seen: locate.is_seen || false
+          is_seen: locate.is_seen || false,
+          entityId: locate.id
         });
       }
     });
@@ -162,7 +187,8 @@ export default function Notifications() {
             icon: Wrench,
             color: GREEN_COLOR,
             rawData: workOrder,
-            is_seen: workOrder.is_seen || false
+            is_seen: workOrder.is_seen || false,
+            entityId: workOrder.id
           });
         }
       } catch (e) {
@@ -225,9 +251,134 @@ export default function Notifications() {
     };
   }, [notifications]);
 
+  // Single mutation for marking a single notification as seen
+  const markAsSeenMutation = useMutation({
+    mutationFn: async (notification) => {
+      if (notification.type === 'RME') {
+        // Mark RME/Work Order as seen
+        await axiosInstance.post('/work-orders-today/mark-seen/', {
+          ids: [notification.entityId]
+        });
+      } else if (notification.type === 'locate') {
+        // Mark Locate as seen
+        await axiosInstance.post('/locates/mark-seen/', {
+          ids: [notification.entityId]
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['notifications-data']);
+      refetch();
+    },
+    onError: (error) => {
+      console.error('Error marking notification as seen:', error);
+    }
+  });
+
+  // Bulk mark all as seen mutation
+  const markAllAsSeenMutation = useMutation({
+    mutationFn: async () => {
+      // Separate IDs by type
+      const locateIds = notifications
+        .filter(n => n.type === 'locate' && !n.is_seen)
+        .map(n => n.entityId);
+      
+      const workOrderIds = notifications
+        .filter(n => n.type === 'RME' && !n.is_seen)
+        .map(n => n.entityId);
+
+      // Make API calls for each type if there are IDs
+      const promises = [];
+
+      if (locateIds.length > 0) {
+        promises.push(
+          axiosInstance.post('/locates/mark-seen/', { ids: locateIds })
+        );
+      }
+
+      if (workOrderIds.length > 0) {
+        promises.push(
+          axiosInstance.post('/work-orders-today/mark-seen/', { ids: workOrderIds })
+        );
+      }
+
+      // Wait for all API calls to complete
+      await Promise.all(promises);
+    },
+    onSuccess: () => {
+      // Invalidate and refetch notifications data
+      queryClient.invalidateQueries(['notifications-data']);
+      refetch();
+    },
+    onError: (error) => {
+      console.error('Error marking all notifications as seen:', error);
+    }
+  });
+
   const handleRefresh = () => {
     queryClient.invalidateQueries(['notifications-data']);
+    refetch();
   };
+
+  const handleMarkAllSeen = () => {
+    if (counts.unseenCount > 0) {
+      markAllAsSeenMutation.mutate();
+    }
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'smooth'
+    });
+  };
+
+  const handleNotificationClick = (notification) => {
+    // Mark as seen if not already seen
+    if (!notification.is_seen) {
+      markAsSeenMutation.mutate(notification);
+    }
+
+    // Get the base dashboard path
+    const dashboardBasePath = getDashboardBasePath();
+
+    // Scroll to top before navigation (optional)
+    scrollToTop();
+
+    // Redirect based on notification type
+    if (notification.type === 'locate') {
+      navigate(`${dashboardBasePath}/locates`, { 
+        state: { 
+          highlightLocateId: notification.entityId,
+          fromNotifications: true,
+          scrollToTop: true
+        }
+      });
+    } else if (notification.type === 'RME') {
+      navigate(`${dashboardBasePath}/health-department-report-tracking/rme`, { 
+        state: { 
+          highlightWorkOrderId: notification.entityId,
+          fromNotifications: true,
+          scrollToTop: true 
+        }
+      });
+    }
+  };
+
+  // Function to mark a single notification as seen without redirecting
+  const handleMarkNotificationSeen = (notification, event) => {
+    // Stop event propagation to prevent the ListItem onClick from firing
+    event.stopPropagation();
+    
+    // Mark the notification as seen
+    markAsSeenMutation.mutate(notification);
+  };
+
+  // Scroll to top on component mount (when coming from other pages)
+  React.useEffect(() => {
+    scrollToTop();
+  }, []);
 
   if (isLoading) {
     return (
@@ -263,6 +414,7 @@ export default function Notifications() {
         <title>Notifications | Sterling Septic & Plumbing LLC</title>
         <meta name="description" content="View and manage notifications" />
       </Helmet>
+      
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
@@ -289,18 +441,50 @@ export default function Notifications() {
               Last 30 days activity
             </Typography>
           </Box>
-          <IconButton
-            onClick={handleRefresh}
-            size="small"
-            sx={{
-              color: GRAY_COLOR,
-              '&:hover': {
-                backgroundColor: alpha(GRAY_COLOR, 0.1)
-              }
-            }}
-          >
-            <TrendingUp size={18} />
-          </IconButton>
+          
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            {counts.unseenCount > 0 && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<Check size={14} />}
+                onClick={handleMarkAllSeen}
+                disabled={markAllAsSeenMutation.isLoading}
+                sx={{
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  color: GREEN_COLOR,
+                  borderColor: alpha(GREEN_COLOR, 0.3),
+                  '&:hover': {
+                    borderColor: GREEN_COLOR,
+                    backgroundColor: alpha(GREEN_COLOR, 0.05),
+                  },
+                  '&.Mui-disabled': {
+                    color: alpha(GREEN_COLOR, 0.5),
+                    borderColor: alpha(GREEN_COLOR, 0.2),
+                  }
+                }}
+              >
+                Mark all read
+              </Button>
+            )}
+            
+            <IconButton
+              onClick={() => {
+                handleRefresh();
+                scrollToTop(); // Also scroll to top on refresh
+              }}
+              size="small"
+              sx={{
+                color: GRAY_COLOR,
+                '&:hover': {
+                  backgroundColor: alpha(GRAY_COLOR, 0.1)
+                }
+              }}
+            >
+              <TrendingUp size={18} />
+            </IconButton>
+          </Box>
         </Box>
 
         {/* Stats Cards */}
@@ -322,6 +506,7 @@ export default function Notifications() {
               {counts.total}
             </Typography>
           </Paper>
+          
           <Paper
             elevation={0}
             sx={{
@@ -381,7 +566,13 @@ export default function Notifications() {
                 top: 0,
                 zIndex: 1
               }}>
-                <Typography variant="subtitle2" sx={{ color: GRAY_COLOR, fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <Typography variant="subtitle2" sx={{ 
+                  color: GRAY_COLOR, 
+                  fontWeight: 600, 
+                  fontSize: '0.75rem', 
+                  textTransform: 'uppercase', 
+                  letterSpacing: '0.5px' 
+                }}>
                   {date}
                 </Typography>
               </Box>
@@ -395,17 +586,57 @@ export default function Notifications() {
                   return (
                     <React.Fragment key={notification.id}>
                       <ListItem
+                        button
+                        onClick={() => handleNotificationClick(notification)}
+                        disabled={markAsSeenMutation.isLoading}
                         sx={{
                           p: 2,
                           backgroundColor: notification.is_seen ? 'transparent' : alpha(notification.color, 0.04),
                           '&:hover': {
                             bgcolor: notification.is_seen
-                              ? alpha(notification.color, 0.03)
-                              : alpha(notification.color, 0.07),
+                              ? alpha(notification.color, 0.08)
+                              : alpha(notification.color, 0.12),
                           },
                           transition: 'background-color 0.2s ease',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          '&.Mui-disabled': {
+                            opacity: 0.7,
+                            cursor: 'not-allowed',
+                          },
+                          '&:hover .close-button': {
+                            opacity: 1,
+                          }
                         }}
                       >
+                        {/* Close Button (X) - Only visible on hover for unread notifications */}
+                        {!notification.is_seen && (
+                          <Tooltip title="Mark as read" placement="top">
+                            <IconButton
+                              size="small"
+                              className="close-button"
+                              onClick={(e) => handleMarkNotificationSeen(notification, e)}
+                              sx={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                width: 24,
+                                height: 24,
+                                opacity: 0,
+                                transition: 'opacity 0.2s ease',
+                                backgroundColor: alpha(GRAY_COLOR, 0.1),
+                                color: GRAY_COLOR,
+                                '&:hover': {
+                                  backgroundColor: alpha(GRAY_COLOR, 0.2),
+                                },
+                                zIndex: 2,
+                              }}
+                            >
+                              <X size={14} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        
                         <ListItemIcon sx={{ minWidth: 44 }}>
                           <Box sx={{
                             width: 36,
@@ -420,17 +651,26 @@ export default function Notifications() {
                             <Icon size={16} />
                           </Box>
                         </ListItemIcon>
+                        
                         <ListItemText
                           primary={
-                            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 0.5 }}>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              alignItems: 'flex-start', 
+                              justifyContent: 'space-between', 
+                              mb: 0.5,
+                              pr: notification.is_seen ? 0 : 3 // Add padding for close button space
+                            }}>
                               <Typography variant="body2" sx={{
                                 color: TEXT_COLOR,
                                 fontWeight: notification.is_seen ? 500 : 600,
                                 fontSize: '0.79rem',
-                                lineHeight: 1.4
+                                lineHeight: 1.4,
+                                flex: 1
                               }}>
                                 {notification.description}
                               </Typography>
+                              
                               <Chip
                                 label={notification.type === 'locate' ? 'Locate' : 'RME'}
                                 size="small"
@@ -441,6 +681,8 @@ export default function Notifications() {
                                   backgroundColor: alpha(notification.color, 0.1),
                                   color: notification.color,
                                   border: `1px solid ${alpha(notification.color, 0.2)}`,
+                                  ml: 1,
+                                  flexShrink: 0
                                 }}
                               />
                             </Box>
@@ -459,6 +701,7 @@ export default function Notifications() {
                                 <Box sx={{ mx: 0.5 }}>•</Box>
                                 {notification.formattedTime}
                               </Typography>
+                              
                               {notification.address && (
                                 <Typography variant="caption" sx={{
                                   color: GRAY_COLOR,
@@ -475,6 +718,7 @@ export default function Notifications() {
                           }
                           sx={{ m: 0 }}
                         />
+                        
                         {!notification.is_seen && (
                           <Box sx={{
                             width: 8,
@@ -485,6 +729,7 @@ export default function Notifications() {
                           }} />
                         )}
                       </ListItem>
+                      
                       {!isLast && (
                         <Divider sx={{ mx: 2, borderColor: alpha(GRAY_COLOR, 0.1) }} />
                       )}
@@ -509,6 +754,7 @@ export default function Notifications() {
           <Typography variant="caption" sx={{ color: GRAY_COLOR }}>
             Showing {notifications.length} notifications from the last 30 days
           </Typography>
+          
           <Typography variant="caption" sx={{
             color: GRAY_COLOR,
             display: 'flex',
@@ -516,11 +762,22 @@ export default function Notifications() {
             gap: 1
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: BLUE_COLOR }} />
+              <Box sx={{ 
+                width: 8, 
+                height: 8, 
+                borderRadius: '50%', 
+                backgroundColor: BLUE_COLOR 
+              }} />
               <span>{counts.locateCount} Locates</span>
             </Box>
+            
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2 }}>
-              <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: GREEN_COLOR }} />
+              <Box sx={{ 
+                width: 8, 
+                height: 8, 
+                borderRadius: '50%', 
+                backgroundColor: GREEN_COLOR 
+              }} />
               <span>{counts.rmeCount} RME</span>
             </Box>
           </Typography>

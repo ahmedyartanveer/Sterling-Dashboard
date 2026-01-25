@@ -177,6 +177,9 @@ export const AppRoutes = () => {
           <Route path="health-department-report-tracking/rme" element={<RMEReports />} />
           <Route path="health-department-report-tracking/rss" element={<RSSReports />} />
           <Route path="health-department-report-tracking/tos" element={<TOSReports />} />
+
+          {/* Notifications */}
+          <Route path="notifications" element={<Notifications />} />
         </Route>
 
         {/* ===================== Tech Routes ===================== */}

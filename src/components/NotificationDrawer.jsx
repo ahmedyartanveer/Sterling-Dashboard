@@ -143,28 +143,21 @@ const NotificationDrawer = ({ onClose }) => {
     // Single mutation for marking notifications as seen
     const markAsSeenMutation = useMutation({
         mutationFn: async (notification) => {
-            // Prepare data in the required format
-            const requestData = {
-                work_orders: [],
-                locates: []
-            };
-
             if (notification.type === 'RME') {
-                requestData.work_orders.push({
-                    id: notification.rawData.id,
-                    is_seen: true
+                // Mark RME/Work Order as seen
+                await axiosInstance.post('/work-orders-today/mark-seen/', {
+                    ids: [notification.entityId]
                 });
             } else if (notification.type === 'locate') {
-                requestData.locates.push({
-                    id: notification.rawData.id,
-                    is_seen: true
+                // Mark Locate as seen
+                await axiosInstance.post('/locates/mark-seen/', {
+                    ids: [notification.entityId]
                 });
             }
-
-            await axiosInstance.patch('/bulk-update/', requestData);
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['notifications-data', user?.role]);
+            refetch();
         },
         onError: (error) => {
             console.error('Error marking notification as seen:', error);
@@ -173,31 +166,37 @@ const NotificationDrawer = ({ onClose }) => {
 
     // Bulk mark all as seen
     const markAllAsSeenMutation = useMutation({
-        mutationFn: async (notifications) => {
-            // Prepare data in the required format
-            const requestData = {
-                work_orders: [],
-                locates: []
-            };
+        mutationFn: async (notificationsArray) => {
+            // Separate IDs by type
+            const locateIds = notificationsArray
+                .filter(n => n.type === 'locate')
+                .map(n => n.entityId);
+            
+            const workOrderIds = notificationsArray
+                .filter(n => n.type === 'RME')
+                .map(n => n.entityId);
 
-            notifications.forEach(notification => {
-                if (notification.type === 'RME') {
-                    requestData.work_orders.push({
-                        id: notification.rawData.id,
-                        is_seen: true
-                    });
-                } else if (notification.type === 'locate') {
-                    requestData.locates.push({
-                        id: notification.rawData.id,
-                        is_seen: true
-                    });
-                }
-            });
+            // Make API calls for each type if there are IDs
+            const promises = [];
 
-            await axiosInstance.patch('/bulk-update/', requestData);
+            if (locateIds.length > 0) {
+                promises.push(
+                    axiosInstance.post('/locates/mark-seen/', { ids: locateIds })
+                );
+            }
+
+            if (workOrderIds.length > 0) {
+                promises.push(
+                    axiosInstance.post('/work-orders-today/mark-seen/', { ids: workOrderIds })
+                );
+            }
+
+            // Wait for all API calls to complete
+            await Promise.all(promises);
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['notifications-data', user?.role]);
+            refetch();
         },
         onError: (error) => {
             console.error('Error marking all notifications as seen:', error);
@@ -232,6 +231,8 @@ const NotificationDrawer = ({ onClose }) => {
                     icon: MapPin,
                     color: NOTIFICATION_COLORS.primary,
                     rawData: locate,
+                    entityId: locate.id,
+                    is_seen: locate.is_seen || false
                 });
             }
         });
@@ -256,6 +257,8 @@ const NotificationDrawer = ({ onClose }) => {
                     icon: Wrench,
                     color: NOTIFICATION_COLORS.success,
                     rawData: workOrder,
+                    entityId: workOrder.id,
+                    is_seen: workOrder.is_seen || false
                 });
             }
         });
@@ -333,6 +336,34 @@ const NotificationDrawer = ({ onClose }) => {
     const handleSingleSeen = (notification, e) => {
         e.stopPropagation();
         markAsSeenMutation.mutate(notification);
+    };
+
+    const handleNotificationClick = (notification) => {
+        // Mark as seen if not already seen
+        if (!notification.is_seen) {
+            markAsSeenMutation.mutate(notification);
+        }
+
+        // Get the base dashboard path
+        const dashboardBasePath = getDashboardBasePath();
+        onClose();
+
+        // Redirect based on notification type
+        if (notification.type === 'locate') {
+            navigate(`${dashboardBasePath}/locates`, { 
+                state: { 
+                    highlightLocateId: notification.entityId,
+                    fromNotifications: true
+                }
+            });
+        } else if (notification.type === 'RME') {
+            navigate(`${dashboardBasePath}/health-department-report-tracking/rme`, { 
+                state: { 
+                    highlightWorkOrderId: notification.entityId,
+                    fromNotifications: true
+                }
+            });
+        }
     };
 
     if (isLoading) return (
@@ -507,6 +538,7 @@ const NotificationDrawer = ({ onClose }) => {
                                     return (
                                         <React.Fragment key={notification.id}>
                                             <ListItem
+                                                onClick={() => handleNotificationClick(notification)}
                                                 sx={{
                                                     p: 2,
                                                     backgroundColor: NOTIFICATION_COLORS.bg,
@@ -514,7 +546,8 @@ const NotificationDrawer = ({ onClose }) => {
                                                     '&:hover': {
                                                         bgcolor: alpha(notification.color, 0.03)
                                                     },
-                                                    transition: 'background-color 0.2s ease'
+                                                    transition: 'background-color 0.2s ease',
+                                                    position: 'relative'
                                                 }}
                                             >
                                                 <ListItemIcon sx={{ minWidth: 44 }}>
@@ -574,6 +607,16 @@ const NotificationDrawer = ({ onClose }) => {
                                                     }
                                                     sx={{ m: 0 }}
                                                 />
+                                                {!notification.is_seen && (
+                                                    <Box sx={{
+                                                        width: 8,
+                                                        height: 8,
+                                                        borderRadius: '50%',
+                                                        backgroundColor: notification.color,
+                                                        ml: 1,
+                                                        flexShrink: 0
+                                                    }} />
+                                                )}
                                                 <IconButton
                                                     size="small"
                                                     onClick={(e) => handleSingleSeen(notification, e)}
@@ -620,27 +663,25 @@ const NotificationDrawer = ({ onClose }) => {
                 flexShrink: 0,
                 backgroundColor: NOTIFICATION_COLORS.grayLight
             }}>
-                {totalNotificationCount > 10 && (
-                    <Button
-                        onClick={handleViewAll}
-                        variant="outlined"
-                        fullWidth
-                        endIcon={<ArrowRight size={14} />}
-                        sx={{
-                            textTransform: 'none',
-                            fontSize: '0.8rem',
-                            fontWeight: 500,
-                            color: NOTIFICATION_COLORS.primary,
-                            borderColor: NOTIFICATION_COLORS.borderLight,
-                            '&:hover': {
-                                borderColor: NOTIFICATION_COLORS.primary,
-                                backgroundColor: alpha(NOTIFICATION_COLORS.primary, 0.04),
-                            },
-                        }}
-                    >
-                        View All Notifications
-                    </Button>
-                )}
+                <Button
+                    onClick={handleViewAll}
+                    variant="outlined"
+                    fullWidth
+                    endIcon={<ArrowRight size={14} />}
+                    sx={{
+                        textTransform: 'none',
+                        fontSize: '0.8rem',
+                        fontWeight: 500,
+                        color: NOTIFICATION_COLORS.primary,
+                        borderColor: NOTIFICATION_COLORS.borderLight,
+                        '&:hover': {
+                            borderColor: NOTIFICATION_COLORS.primary,
+                            backgroundColor: alpha(NOTIFICATION_COLORS.primary, 0.04),
+                        },
+                    }}
+                >
+                    View All Notifications
+                </Button>
             </Box>
         </Box>
     );

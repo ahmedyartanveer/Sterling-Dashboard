@@ -303,7 +303,6 @@ const MobilePageTitle = styled(Typography)(({ theme }) => ({
     maxWidth: '120px',
   },
 }));
-;
 
 const DrawerCloseButton = styled(IconButton)(({ theme }) => ({
   position: 'absolute',
@@ -663,6 +662,9 @@ const DashboardLayout = ({ children, title, menuItems }) => {
                 px: 2.5,
                 py: 0.75,
                 mb: 0.25,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-start', // Changed to flex-start
               }}>
                 <Typography
                   variant="caption"
@@ -677,6 +679,7 @@ const DashboardLayout = ({ children, title, menuItems }) => {
                 >
                   {section.sectionName}
                 </Typography>
+                {/* REMOVED BADGE from section header - NO badges on section headers */}
               </Box>
             )}
 
@@ -860,8 +863,6 @@ const DashboardLayout = ({ children, title, menuItems }) => {
                 backgroundColor: alpha('#ffffff', 0.1),
                 borderRadius: '5px',
                 border: `1px solid ${alpha('#ffffff', 0.3)}`,
-                width: 38,
-                height: 38,
                 '&:hover': {
                   backgroundColor: alpha('#ffffff', 0.2),
                   color: colors.primary,
@@ -874,20 +875,20 @@ const DashboardLayout = ({ children, title, menuItems }) => {
                 sx={{
                   '& .MuiBadge-badge': {
                     fontSize: '0.55rem',
-                    height: '14px',
-                    minWidth: '14px',
+                    height: '13px',
+                    minWidth: '13px',
                     bgcolor: colors.red,
                   }
                 }}
               >
-                <Bell size={18} />
+                <Bell size={22} />
               </Badge>
             </IconButton>
 
             <IconButton
               onClick={handleMenuOpen}
               sx={{
-                p: 0.5,
+                p: 0.1,
                 borderRadius: '5px',
                 border: `1px solid ${alpha('#ffffff', 0.3)}`,
                 backgroundColor: alpha('#ffffff', 0.1),
@@ -898,11 +899,11 @@ const DashboardLayout = ({ children, title, menuItems }) => {
             >
               <Avatar
                 sx={{
-                  width: 28,
-                  height: 28,
+                  width: 35,
+                  height: 35,
                   bgcolor: colors.primary,
                   color: colors.white,
-                  fontSize: '0.75rem',
+                  fontSize: '0.85rem',
                   fontWeight: 600,
                 }}
               >

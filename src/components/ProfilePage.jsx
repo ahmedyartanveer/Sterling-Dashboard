@@ -47,6 +47,7 @@ import { Helmet } from 'react-helmet-async';
 import DashboardLoader from './Loader/DashboardLoader';
 import OutlineButton from './ui/OutlineButton';
 import DeviceList from './DeviceList'; // Add this import
+import GradientButton from './ui/GradientButton';
 
 // Define color constants (matching your other components)
 const TEXT_COLOR = '#0F1115';
@@ -460,23 +461,14 @@ export const ProfilePage = ({ roleLabel }) => {
                     </Typography>
                 </Box>
                 {!isEditing ? (
-                    <Button
+                    <GradientButton
                         variant="contained"
                         startIcon={<Edit size={16} />}
                         onClick={() => setIsEditing(true)}
                         disabled={updating}
-                        sx={{
-                            textTransform: 'none',
-                            fontSize: isMobile ? '0.75rem' : '0.85rem',
-                            fontWeight: 500,
-                            backgroundColor: BLUE_COLOR,
-                            '&:hover': {
-                                backgroundColor: alpha(BLUE_COLOR, 0.9),
-                            },
-                        }}
                     >
                         Edit Profile
-                    </Button>
+                    </GradientButton>
                 ) : (
                     <Box display="flex" gap={1}>
                         <OutlineButton
@@ -489,23 +481,14 @@ export const ProfilePage = ({ roleLabel }) => {
                         >
                             Cancel
                         </OutlineButton>
-                        <Button
+                        <GradientButton
                             variant="contained"
                             startIcon={<Save size={16} />}
                             onClick={handleSave}
                             disabled={updating}
-                            sx={{
-                                textTransform: 'none',
-                                fontSize: isMobile ? '0.75rem' : '0.85rem',
-                                fontWeight: 500,
-                                backgroundColor: BLUE_COLOR,
-                                '&:hover': {
-                                    backgroundColor: alpha(BLUE_COLOR, 0.9),
-                                },
-                            }}
                         >
                             {updating ? 'Saving...' : 'Save Changes'}
-                        </Button>
+                        </GradientButton>
                     </Box>
                 )}
             </Box>
@@ -881,31 +864,22 @@ export const ProfilePage = ({ roleLabel }) => {
                 </DialogContent>
                 <DialogActions sx={{ px: 2.5, pb: 2.5, pt: 0 }}>
                     <OutlineButton
+                        startIcon={<X size={16} />}
                         onClick={handleClosePasswordDialog}
                         sx={{
-                            fontSize: '0.85rem',
-                            px: 2,
+                            fontSize: isMobile ? '0.75rem' : '0.85rem',
                         }}
                     >
                         Cancel
                     </OutlineButton>
-                    <Button
+                    <GradientButton
                         onClick={handleChangePassword}
                         variant="contained"
                         disabled={changePasswordMutation.isPending}
                         startIcon={changePasswordMutation.isPending ? <RefreshCw size={16} /> : <Key size={16} />}
-                        sx={{
-                            fontSize: '0.85rem',
-                            fontWeight: 500,
-                            px: 2,
-                            bgcolor: BLUE_COLOR,
-                            '&:hover': {
-                                bgcolor: alpha(BLUE_COLOR, 0.9),
-                            },
-                        }}
                     >
                         {changePasswordMutation.isPending ? 'Changing...' : 'Change Password'}
-                    </Button>
+                    </GradientButton>
                 </DialogActions>
             </Dialog>
 

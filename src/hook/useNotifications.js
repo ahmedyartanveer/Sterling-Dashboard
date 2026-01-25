@@ -1,7 +1,6 @@
-// hooks/useNotifications.js
 import { useQuery } from '@tanstack/react-query';
-import axiosInstance from '../api/axios';
 import { useAuth } from '../auth/AuthProvider';
+import axiosInstance from '../api/axios';
 
 const formatDate = (dateString) => {
     if (!dateString) return null;
@@ -22,21 +21,30 @@ export const useNotifications = () => {
                 return {
                     locates: [],
                     workOrders: [],
-                    count: 0,
                     latestNotifications: [],
+                    count: 0,
                     totalActualCount: 0,
+                    locatesCount: 0,
+                    workOrdersCount: 0,
+                    unseenLocateIds: [],
+                    unseenRmeIds: [],
+                    unseenIds: [],
                 };
             }
 
             const role = user.role?.toUpperCase();
-
             if (role !== 'SUPERADMIN' && role !== 'MANAGER') {
                 return {
                     locates: [],
                     workOrders: [],
-                    count: 0,
                     latestNotifications: [],
+                    count: 0,
                     totalActualCount: 0,
+                    locatesCount: 0,
+                    workOrdersCount: 0,
+                    unseenLocateIds: [],
+                    unseenRmeIds: [],
+                    unseenIds: [],
                 };
             }
 
@@ -51,54 +59,76 @@ export const useNotifications = () => {
 
             const workOrdersData = Array.isArray(workOrdersResponse.data)
                 ? workOrdersResponse.data
-                : [];
+                : workOrdersResponse.data?.data || [];
 
             const oneMonthAgo = new Date();
             oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
-            let count = 0;
+            let locatesCount = 0;
+            let workOrdersCount = 0;
+
             const latestNotifications = [];
+            const unseenLocateIds = [];
+            const unseenRmeIds = [];
 
             locatesData.forEach(locate => {
                 const createdDate = formatDate(
                     locate.created_at || locate.created_date
                 );
-                if (!createdDate || locate.is_seen) return;
-                if (createdDate >= oneMonthAgo) {
+                if (!createdDate) return;
+
+                if (createdDate >= oneMonthAgo && !locate.is_seen) {
+                    locatesCount++;
+
+                    const id = `locate-${locate.id}`;
+                    unseenLocateIds.push(id);
+
                     if (latestNotifications.length < 10) {
                         latestNotifications.push({
-                            id: `locate-${locate.id}`,
+                            id,
                             type: 'locate',
                             timestamp: createdDate,
                         });
                     }
-                    count++;
                 }
             });
 
             workOrdersData.forEach(workOrder => {
                 const elapsedDate = formatDate(workOrder.elapsed_time);
-                if (!elapsedDate || workOrder.is_seen) return;
-                if (elapsedDate >= oneMonthAgo) {
+                if (!elapsedDate) return;
+
+                if (elapsedDate >= oneMonthAgo && !workOrder.is_seen) {
+                    workOrdersCount++;
+
+                    const id = `rme-${workOrder.id}`;
+                    unseenRmeIds.push(id);
+
                     if (latestNotifications.length < 10) {
                         latestNotifications.push({
-                            id: `rme-${workOrder.id}`,
+                            id,
                             type: 'RME',
                             timestamp: elapsedDate,
                         });
                     }
-                    count++;
                 }
             });
 
             latestNotifications.sort((a, b) => b.timestamp - a.timestamp);
 
+            const unseenIds = [...unseenLocateIds, ...unseenRmeIds];
+            const totalActualCount = locatesCount + workOrdersCount;
+
             return {
                 locates: locatesData,
                 workOrders: workOrdersData,
-                count: Math.min(count, 10),
                 latestNotifications: latestNotifications.slice(0, 10),
-                totalActualCount: count,
+                locatesCount,
+                workOrdersCount,
+                totalActualCount,
+                unseenLocateIds,
+                unseenRmeIds,
+                unseenIds,
+                count: Math.min(totalActualCount, 10),
             };
         },
         staleTime: 30000,
@@ -112,5 +142,10 @@ export const useNotifications = () => {
         refetch,
         badgeCount: data?.count || 0,
         totalCount: data?.totalActualCount || 0,
+        locatesCount: data?.locatesCount || 0,
+        rmeCount: data?.workOrdersCount || 0,
+        unseenLocateIds: data?.unseenLocateIds || [],
+        unseenRmeIds: data?.unseenRmeIds || [],
+        unseenIds: data?.unseenIds || [],
     };
 };

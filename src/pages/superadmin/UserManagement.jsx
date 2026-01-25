@@ -52,6 +52,7 @@ import {
     RefreshCw,
     X,
 } from 'lucide-react';
+import GradientButton from '../../components/ui/GradientButton';
 
 // Define color constants
 const TEXT_COLOR = '#0F1115';
@@ -285,9 +286,9 @@ export const UserManagement = () => {
             if (!updateData.password) {
                 delete updateData.password;
             }
-            updateUserMutation.mutate({ 
-                userId: selectedUser.id || selectedUser._id, 
-                userData: updateData 
+            updateUserMutation.mutate({
+                userId: selectedUser.id || selectedUser._id,
+                userData: updateData
             });
         } else {
             createUserMutation.mutate(formData);
@@ -456,22 +457,13 @@ export const UserManagement = () => {
                         Manage users and their roles
                     </Typography>
                 </Box>
-                <Button
+                <GradientButton
                     variant="contained"
                     startIcon={<UserPlus size={16} />}
                     onClick={() => handleOpenDialog()}
-                    sx={{
-                        textTransform: 'none',
-                        fontSize: isMobile ? '0.75rem' : '0.85rem',
-                        fontWeight: 500,
-                        backgroundColor: BLUE_COLOR,
-                        '&:hover': {
-                            backgroundColor: alpha(BLUE_COLOR, 0.9),
-                        },
-                    }}
                 >
                     Add User
-                </Button>
+                </GradientButton>
             </Box>
 
             {/* Main Table Section */}
@@ -1009,6 +1001,9 @@ export const UserManagement = () => {
                                 <option value="manager">
                                     Manager
                                 </option>
+                                <option value="superadmin">
+                                    Supper Admin
+                                </option>
                                 <option value="tech">
                                     Tech
                                 </option>
@@ -1054,15 +1049,14 @@ export const UserManagement = () => {
                 <DialogActions sx={{ px: 2.5, pb: 2.5, pt: 0 }}>
                     <OutlineButton
                         onClick={handleCloseDialog}
+                        startIcon={<X size={16} />}
                         sx={{
-                            fontSize: '0.85rem',
-                            px: 2,
-                            py: 0.8,
+                            fontSize: isMobile ? '0.75rem' : '0.85rem',
                         }}
                     >
                         Cancel
                     </OutlineButton>
-                    <Button
+                    <GradientButton
                         onClick={handleSubmit}
                         variant="contained"
                         disabled={
@@ -1073,16 +1067,6 @@ export const UserManagement = () => {
                             (!selectedUser && !formData.password)
                         }
                         startIcon={selectedUser ? <Edit size={16} /> : <UserPlus size={16} />}
-                        sx={{
-                            fontSize: '0.85rem',
-                            fontWeight: 500,
-                            px: 2,
-                            py: 0.8,
-                            bgcolor: BLUE_COLOR,
-                            '&:hover': {
-                                bgcolor: alpha(BLUE_COLOR, 0.9),
-                            },
-                        }}
                     >
                         {createUserMutation.isPending || updateUserMutation.isPending ? (
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1092,7 +1076,7 @@ export const UserManagement = () => {
                         ) : (
                             selectedUser ? 'Update User' : 'Create User'
                         )}
-                    </Button>
+                    </GradientButton>
                 </DialogActions>
             </Dialog>
 
@@ -1149,10 +1133,9 @@ export const UserManagement = () => {
                 <DialogActions sx={{ px: 2.5, pb: 2.5, pt: 0 }}>
                     <OutlineButton
                         onClick={() => setOpenDeleteDialog(false)}
+                        startIcon={<X size={16} />}
                         sx={{
-                            fontSize: '0.85rem',
-                            px: 2,
-                            py: 0.8,
+                            fontSize: isMobile ? '0.75rem' : '0.85rem',
                         }}
                     >
                         Cancel
@@ -1245,10 +1228,9 @@ export const UserManagement = () => {
                 <DialogActions sx={{ px: 2.5, pb: 2.5, pt: 0 }}>
                     <OutlineButton
                         onClick={() => setOpenStatusDialog(false)}
+                        startIcon={<X size={16} />}
                         sx={{
-                            fontSize: '0.85rem',
-                            px: 2,
-                            py: 0.8,
+                            fontSize: isMobile ? '0.75rem' : '0.85rem',
                         }}
                     >
                         Cancel
@@ -1266,6 +1248,7 @@ export const UserManagement = () => {
                         )}
                         sx={{
                             fontSize: '0.85rem',
+                            textTransform: 'none',
                             px: 2,
                             py: 0.8,
                             bgcolor: userToToggle?.isActive ? RED_COLOR : GREEN_COLOR,

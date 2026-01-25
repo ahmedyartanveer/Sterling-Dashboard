@@ -3,8 +3,8 @@ import { Button, styled } from '@mui/material';
 const OutlineButton = styled(Button)(({ theme }) => ({
     border: `1px solid #dc2626`,
     color: '#dc2626',
-    borderRadius: '2px',
-    padding: '2px 10px',
+    borderRadius: '5px',
+    padding: '6px 16px',
     fontWeight: 500,
     textTransform: 'none',
     fontSize: '13px',

@@ -22,6 +22,7 @@ import {
     Edit,
     X,
 } from 'lucide-react';
+import GradientButton from './ui/GradientButton';
 
 // Color constants matching your other components
 const TEXT_COLOR = '#0F1115';
@@ -325,24 +326,13 @@ const ProfileDialog = ({ open, onClose, user, userRole }) => {
                 pt: 1.5,
                 borderTop: `1px solid ${alpha(BLUE_COLOR, 0.1)}`,
             }}>
-                <Button
+                <GradientButton
                     onClick={handleEditProfile}
                     variant="contained"
                     startIcon={<Edit size={16} />}
-                    sx={{
-                        textTransform: 'none',
-                        fontSize: '0.85rem',
-                        fontWeight: 500,
-                        px: 2,
-                        py: 0.8,
-                        bgcolor: BLUE_COLOR,
-                        '&:hover': {
-                            bgcolor: alpha(BLUE_COLOR, 0.9),
-                        },
-                    }}
                 >
                     Edit Profile
-                </Button>
+                </GradientButton>
             </DialogActions>
         </Dialog>
     );

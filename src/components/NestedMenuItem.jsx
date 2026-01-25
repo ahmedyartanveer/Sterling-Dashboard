@@ -7,7 +7,10 @@ import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
 import Box from '@mui/material/Box';
+import Badge from '@mui/material/Badge';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useNotifications } from '../hook/useNotifications';
+import axiosInstance from '../api/axios';
 
 const colors = {
     primary: '#3182ce',
@@ -25,6 +28,9 @@ const colors = {
     white: '#ffffff',
     black: '#000000',
     appBarBg: 'rgba(255, 255, 255, 0.1)',
+    red: '#ef4444',
+    green: '#10b981',
+    blue: '#1976d2',
 };
 
 const HoverMenu = styled(Box)(({ theme }) => ({
@@ -48,6 +54,7 @@ const HoverMenuItem = styled(Box)(({ theme }) => ({
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: '10px',
     fontSize: '0.8rem',
     fontWeight: 500,
@@ -80,6 +87,9 @@ const NestedMenuItem = ({
     const isExpanded = item.expanded;
     const [hoverMenuAnchor, setHoverMenuAnchor] = React.useState(null);
     const [hoverTimeout, setHoverTimeout] = React.useState(null);
+    const [isMarkingAsSeen, setIsMarkingAsSeen] = React.useState(false);
+    
+    const { notifications, refetch } = useNotifications();
 
     const isItemActive = (path) => {
         if (!path) return false;
@@ -98,6 +108,59 @@ const NestedMenuItem = ({
     };
 
     const isActive = isItemActive(item.path);
+
+    // Function to mark notifications as seen for a specific path
+    const markNotificationsAsSeenForPath = async (path) => {
+        if (!notifications || !notifications.locates || !notifications.workOrders) {
+            return;
+        }
+
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+        try {
+            switch (path) {
+                case '/super-admin-dashboard/locates':
+                    // Get all unseen locate IDs
+                    const locateIds = notifications.locates
+                        .filter(locate => {
+                            const createdDate = new Date(locate.created_at || locate.created_date);
+                            return createdDate >= oneMonthAgo && !locate.is_seen;
+                        })
+                        .map(locate => locate.id);
+
+                    if (locateIds.length > 0) {
+                        await axiosInstance.post('/locates/mark-seen/', {
+                            ids: locateIds
+                        });
+                    }
+                    break;
+
+                case '/super-admin-dashboard/health-department-report-tracking/rme':
+                    // Get all unseen RME IDs
+                    const rmeIds = notifications.workOrders
+                        .filter(workOrder => {
+                            const elapsedDate = new Date(workOrder.elapsed_time);
+                            return elapsedDate >= oneMonthAgo && !workOrder.is_seen;
+                        })
+                        .map(workOrder => workOrder.id);
+
+                    if (rmeIds.length > 0) {
+                        await axiosInstance.post('/work-orders-today/mark-seen/', {
+                            ids: rmeIds
+                        });
+                    }
+                    break;
+            }
+
+            // Immediately refetch notifications
+            refetch();
+        } catch (error) {
+            console.error('Error marking notifications as seen:', error);
+        } finally {
+            setIsMarkingAsSeen(false);
+        }
+    };
 
     const handleMouseEnter = (event) => {
         if (!isDrawerOpen && !isMobile) {
@@ -126,7 +189,7 @@ const NestedMenuItem = ({
         setHoverTimeout(timeout);
     };
 
-    const handleItemClick = (event) => {
+    const handleItemClick = async (event) => {
         event.preventDefault();
         event.stopPropagation();
 
@@ -145,6 +208,13 @@ const NestedMenuItem = ({
                 // Open external link in new tab
                 window.open(item.path, '_blank');
             } else {
+                // Mark notifications as seen for specific paths
+                if (item.path === '/super-admin-dashboard/locates' || 
+                    item.path === '/super-admin-dashboard/health-department-report-tracking/rme') {
+                    setIsMarkingAsSeen(true);
+                    await markNotificationsAsSeenForPath(item.path);
+                }
+                
                 // Internal navigation - close drawer on mobile
                 handleNavigation(item.path);
                 if (isMobile && onCloseDrawer) {
@@ -157,12 +227,34 @@ const NestedMenuItem = ({
         setHoverMenuAnchor(null);
     };
 
+    const renderBadge = (count) => {
+        if (!count || count <= 0) return null;
+
+        return (
+            <Badge
+                badgeContent={count}
+                color="error"
+                sx={{
+                    ml: 'auto',
+                    mr: isExpandable ? 0.5 : 0,
+                    '& .MuiBadge-badge': {
+                        fontSize: '0.55rem',
+                        height: '14px',
+                        minWidth: '14px',
+                        bgcolor: colors.red,
+                    }
+                }}
+            />
+        );
+    };
+
     const mainButton = (
         <ListItemButton
             component="div"
             onClick={handleItemClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
+            disabled={isMarkingAsSeen}
             sx={[
                 getActiveStyles(item.path),
                 {
@@ -181,10 +273,12 @@ const NestedMenuItem = ({
                     },
                     '& .MuiListItemText-root': {
                         m: 0,
+                        flex: 1,
                         display: isDrawerOpen ? 'block' : 'none', // Hide text when drawer is closed
                     },
                     textDecoration: 'none',
-                    cursor: 'pointer',
+                    cursor: isMarkingAsSeen ? 'wait' : 'pointer',
+                    opacity: isMarkingAsSeen ? 0.7 : 1,
                 },
                 isExpandable && {
                     pr: 1.25,
@@ -214,10 +308,12 @@ const NestedMenuItem = ({
                             letterSpacing: '0.01em',
                         }}>
                             {item.text}
+                            {isMarkingAsSeen && '...'}
                         </Typography>
                     }
                 />
             )}
+            {isDrawerOpen && item.hasCount && !isMarkingAsSeen && renderBadge(item.count)}
             {isExpandable && isDrawerOpen && (
                 <ListItemIcon sx={{
                     minWidth: 0,
@@ -284,8 +380,24 @@ const NestedMenuItem = ({
                         borderBottom: hasSubItems ? `1px solid ${alpha('#ffffff', 0.2)}` : 'none',
                     }}
                 >
-                    {React.cloneElement(item.icon, { size: 16, color: isActive ? colors.primary : colors.textPrimary })}
-                    <span>{item.text}</span>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {React.cloneElement(item.icon, { size: 16, color: isActive ? colors.primary : colors.textPrimary })}
+                        <span>{item.text}{isMarkingAsSeen && '...'}</span>
+                    </Box>
+                    {item.hasCount && !isMarkingAsSeen && (
+                        <Badge
+                            badgeContent={item.count}
+                            color="error"
+                            sx={{
+                                '& .MuiBadge-badge': {
+                                    fontSize: '0.55rem',
+                                    height: '14px',
+                                    minWidth: '14px',
+                                    bgcolor: colors.red,
+                                }
+                            }}
+                        />
+                    )}
                     {item.path && (item.path.startsWith('http://') || item.path.startsWith('https://')) && (
                         <Box component="span" sx={{ ml: 'auto', fontSize: '0.7rem', opacity: 0.7 }}>
                             ↗
@@ -299,37 +411,62 @@ const NestedMenuItem = ({
                     const hasNestedSubItems = subItem.subItems && subItem.subItems.length > 0;
                     const isSubItemExternal = subItem.path && (subItem.path.startsWith('http://') || subItem.path.startsWith('https://'));
 
+                    const handleSubItemClick = async (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        
+                        if (isSubItemExternal) {
+                            window.open(subItem.path, '_blank');
+                        } else if (subItem.path) {
+                            // Mark notifications as seen for specific paths
+                            if (subItem.path === '/super-admin-dashboard/locates' || 
+                                subItem.path === '/super-admin-dashboard/health-department-report-tracking/rme') {
+                                setIsMarkingAsSeen(true);
+                                await markNotificationsAsSeenForPath(subItem.path);
+                            }
+                            
+                            handleNavigation(subItem.path);
+                        } else if (subItem.onClick) {
+                            subItem.onClick(event);
+                        }
+                        setHoverMenuAnchor(null);
+                    };
+
                     return (
                         <React.Fragment key={index}>
                             {/* Sub-item with its own navigation */}
                             <HoverMenuItem
-                                onClick={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    if (isSubItemExternal) {
-                                        window.open(subItem.path, '_blank');
-                                    } else if (subItem.path) {
-                                        handleNavigation(subItem.path);
-                                    } else if (subItem.onClick) {
-                                        subItem.onClick(event);
-                                    }
-                                    setHoverMenuAnchor(null);
-                                }}
+                                onClick={handleSubItemClick}
                                 className={isSubItemActive ? 'active' : ''}
-                                sx={{
-                                    pl: 3,
-                                }}
                             >
-                                {subItem.icon && React.cloneElement(subItem.icon, {
-                                    size: 14,
-                                    color: isSubItemActive ? colors.primary : colors.textPrimary
-                                })}
-                                <span>{subItem.text}</span>
-                                {isSubItemExternal && (
-                                    <Box component="span" sx={{ ml: 'auto', fontSize: '0.7rem', opacity: 0.7 }}>
-                                        ↗
-                                    </Box>
-                                )}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', pl: 3 }}>
+                                    {subItem.icon && React.cloneElement(subItem.icon, {
+                                        size: 14,
+                                        color: isSubItemActive ? colors.primary : colors.textPrimary
+                                    })}
+                                    <span>{subItem.text}</span>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    {subItem.hasCount && !isMarkingAsSeen && (
+                                        <Badge
+                                            badgeContent={subItem.count}
+                                            color="error"
+                                            sx={{
+                                                '& .MuiBadge-badge': {
+                                                    fontSize: '0.55rem',
+                                                    height: '14px',
+                                                    minWidth: '14px',
+                                                    bgcolor: colors.red,
+                                                }
+                                            }}
+                                        />
+                                    )}
+                                    {isSubItemExternal && (
+                                        <Box component="span" sx={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                                            ↗
+                                        </Box>
+                                    )}
+                                </Box>
                             </HoverMenuItem>
 
                             {/* Nested sub-items */}
@@ -337,36 +474,61 @@ const NestedMenuItem = ({
                                 const isNestedItemActive = isItemActive(nestedItem.path);
                                 const isNestedItemExternal = nestedItem.path && (nestedItem.path.startsWith('http://') || nestedItem.path.startsWith('https://'));
 
+                                const handleNestedItemClick = async (event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    
+                                    if (isNestedItemExternal) {
+                                        window.open(nestedItem.path, '_blank');
+                                    } else if (nestedItem.path) {
+                                        // Mark notifications as seen for specific paths
+                                        if (nestedItem.path === '/super-admin-dashboard/locates' || 
+                                            nestedItem.path === '/super-admin-dashboard/health-department-report-tracking/rme') {
+                                            setIsMarkingAsSeen(true);
+                                            await markNotificationsAsSeenForPath(nestedItem.path);
+                                        }
+                                        
+                                        handleNavigation(nestedItem.path);
+                                    } else if (nestedItem.onClick) {
+                                        nestedItem.onClick(event);
+                                    }
+                                    setHoverMenuAnchor(null);
+                                };
+
                                 return (
                                     <HoverMenuItem
                                         key={`${index}-${nestedIndex}`}
-                                        onClick={(event) => {
-                                            event.preventDefault();
-                                            event.stopPropagation();
-                                            if (isNestedItemExternal) {
-                                                window.open(nestedItem.path, '_blank');
-                                            } else if (nestedItem.path) {
-                                                handleNavigation(nestedItem.path);
-                                            } else if (nestedItem.onClick) {
-                                                nestedItem.onClick(event);
-                                            }
-                                            setHoverMenuAnchor(null);
-                                        }}
+                                        onClick={handleNestedItemClick}
                                         className={isNestedItemActive ? 'active' : ''}
-                                        sx={{
-                                            pl: 5,
-                                        }}
                                     >
-                                        {nestedItem.icon && React.cloneElement(nestedItem.icon, {
-                                            size: 12,
-                                            color: isNestedItemActive ? colors.primary : colors.textPrimary
-                                        })}
-                                        <span style={{ fontSize: '0.75rem' }}>{nestedItem.text}</span>
-                                        {isNestedItemExternal && (
-                                            <Box component="span" sx={{ ml: 'auto', fontSize: '0.65rem', opacity: 0.7 }}>
-                                                ↗
-                                            </Box>
-                                        )}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px', pl: 5 }}>
+                                            {nestedItem.icon && React.cloneElement(nestedItem.icon, {
+                                                size: 12,
+                                                color: isNestedItemActive ? colors.primary : colors.textPrimary
+                                            })}
+                                            <span style={{ fontSize: '0.75rem' }}>{nestedItem.text}</span>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            {nestedItem.hasCount && !isMarkingAsSeen && (
+                                                <Badge
+                                                    badgeContent={nestedItem.count}
+                                                    color="error"
+                                                    sx={{
+                                                        '& .MuiBadge-badge': {
+                                                            fontSize: '0.55rem',
+                                                            height: '14px',
+                                                            minWidth: '14px',
+                                                            bgcolor: colors.red,
+                                                        }
+                                                    }}
+                                                />
+                                            )}
+                                            {isNestedItemExternal && (
+                                                <Box component="span" sx={{ fontSize: '0.65rem', opacity: 0.7 }}>
+                                                    ↗
+                                                </Box>
+                                            )}
+                                        </Box>
                                     </HoverMenuItem>
                                 );
                             })}

@@ -1,15 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard,
     Users,
     MapPin,
     FileText,
-    Bell,
-    BellRing,
     ClipboardList,
     History,
     Database,
-    User,
     BarChart3,
     AlertTriangle,
     ClipboardCheck,
@@ -23,7 +20,6 @@ import {
     GraduationCap,
     LibraryBig,
     Search,
-    // Additional icons from manager menu
     Settings,
     Wrench,
     Calendar,
@@ -34,10 +30,13 @@ import {
     Award,
     FileEdit,
     CheckSquare,
-    MapIcon,
-    MapPinIcon,
+    Map,
     TruckIcon,
 } from 'lucide-react';
+import { useNotifications } from '../../../hook/useNotifications';
+import axiosInstance from '../../../api/axios';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 
 export const ManagerMenuComponent = ({ onMenuItemClick }) => {
     const [expandedSections, setExpandedSections] = useState({
@@ -51,7 +50,13 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
         'reports-subsection': false,
         'forms-subsection': false,
         'health-reports': false,
+        'technicians-subsection': false,
+        'sales-subsection': false,
     });
+
+    const location = useLocation();
+    const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
     const toggleSection = (sectionId) => {
         setExpandedSections(prev => ({
@@ -59,6 +64,144 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
             [sectionId]: !prev[sectionId],
         }));
     };
+
+    const { notifications, badgeCount, locatesCount, rmeCount, unseenLocateIds, unseenRmeIds, refetch } = useNotifications();
+
+    // Function to calculate counts for each menu item - ONLY for locates and RME
+    const calculateItemCounts = (path) => {
+        if (!notifications || !notifications.locates || !notifications.workOrders) {
+            return 0;
+        }
+
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+        // ONLY count for specific paths
+        switch (path) {
+            case '/manager-dashboard/locates':
+                // Count unseen locates from last 30 days
+                return notifications.locates.filter(locate => {
+                    const createdDate = new Date(locate.created_at || locate.created_date);
+                    return createdDate >= oneMonthAgo && !locate.is_seen;
+                }).length;
+
+            case '/manager-dashboard/health-department-report-tracking/rme':
+                // Count unseen RME from last 30 days
+                return notifications.workOrders.filter(workOrder => {
+                    const elapsedDate = new Date(workOrder.elapsed_time);
+                    return elapsedDate >= oneMonthAgo && !workOrder.is_seen;
+                }).length;
+
+            // All other paths return 0
+            default:
+                return 0;
+        }
+    };
+
+    // Function to calculate parent item counts based on child counts
+    const calculateParentCount = (subItems) => {
+        if (!subItems || subItems.length === 0) return 0;
+
+        let totalCount = 0;
+        subItems.forEach(subItem => {
+            if (subItem.subItems) {
+                // If it has nested sub-items, recursively calculate
+                totalCount += calculateParentCount(subItem.subItems);
+            } else {
+                // Calculate count for this specific path
+                totalCount += calculateItemCounts(subItem.path);
+            }
+        });
+        return totalCount;
+    };
+
+    // Function to mark all notifications as seen when visiting a specific path
+    const markNotificationsAsSeenForPath = async (path) => {
+        if (!notifications || !notifications.locates || !notifications.workOrders) {
+            return;
+        }
+
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+        try {
+            switch (path) {
+                case '/manager-dashboard/locates':
+                    // Get all unseen locate IDs
+                    const locateIds = notifications.locates
+                        .filter(locate => {
+                            const createdDate = new Date(locate.created_at || locate.created_date);
+                            return createdDate >= oneMonthAgo && !locate.is_seen;
+                        })
+                        .map(locate => locate.id);
+
+                    if (locateIds.length > 0) {
+                        await axiosInstance.post('/locates/mark-seen/', {
+                            ids: locateIds
+                        });
+                    }
+                    break;
+
+                case '/manager-dashboard/health-department-report-tracking/rme':
+                    // Get all unseen RME IDs
+                    const rmeIds = notifications.workOrders
+                        .filter(workOrder => {
+                            const elapsedDate = new Date(workOrder.elapsed_time);
+                            return elapsedDate >= oneMonthAgo && !workOrder.is_seen;
+                        })
+                        .map(workOrder => workOrder.id);
+
+                    if (rmeIds.length > 0) {
+                        await axiosInstance.post('/work-orders-today/mark-seen/', {
+                            ids: rmeIds
+                        });
+                    }
+                    break;
+            }
+
+            // Invalidate queries to refresh data IMMEDIATELY
+            queryClient.invalidateQueries(['notifications-count']);
+            refetch(); // Force immediate refetch
+        } catch (error) {
+            console.error('Error marking notifications as seen:', error);
+        }
+    };
+
+    // Handle menu item click with notification clearing
+    const handleMenuItemClick = (path) => {
+        // Mark notifications as seen for this path (only for locates and RME)
+        if (path === '/manager-dashboard/locates' ||
+            path === '/manager-dashboard/health-department-report-tracking/rme') {
+            markNotificationsAsSeenForPath(path);
+        }
+
+        // Navigate to the path
+        if (path.startsWith('http')) {
+            window.open(path, '_blank');
+        } else {
+            navigate(path);
+        }
+
+        // Call the original onMenuItemClick if provided
+        if (onMenuItemClick) {
+            onMenuItemClick(path);
+        }
+    };
+
+    // Auto-mark notifications as seen when user visits specific routes
+    useEffect(() => {
+        const currentPath = location.pathname;
+
+        // Check if current path should trigger notification clearing
+        const pathsToClear = [
+            '/manager-dashboard/locates',
+            '/manager-dashboard/health-department-report-tracking/rme'
+        ];
+
+        if (pathsToClear.includes(currentPath)) {
+            markNotificationsAsSeenForPath(currentPath);
+        }
+    }, [location.pathname]);
 
     const menuItems = [
         // 🧭 GENERAL
@@ -90,12 +233,12 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                         },
                         {
                             text: 'Logistics Map',
-                            icon: <MapIcon size={16} />,
+                            icon: <Map size={16} />,
                             path: '/manager-dashboard/logistics-map',
                         },
                         {
                             text: 'Locates',
-                            icon: <MapPinIcon size={16} />,
+                            icon: <MapPin size={16} />,
                             path: '/manager-dashboard/locates',
                         },
                     ],
@@ -258,7 +401,7 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                             path: '/manager-dashboard/approvals',
                         },
                     ],
-                },
+                }
             ],
         },
 
@@ -292,13 +435,45 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
         },
     ];
 
-    // 🔄 Process menu items
+    // 🔄 Process menu items with counts
     const processedMenuItems = menuItems.map(section => {
         const processedItems = section.items.map(item => {
+            // Calculate count for this item
+            let itemCount = 0;
+
+            if (item.isExpandable && item.subItems) {
+                // For expandable items, calculate total count from all sub-items
+                itemCount = calculateParentCount(item.subItems);
+            } else {
+                // For non-expandable items, calculate count based on path
+                itemCount = calculateItemCounts(item.path);
+            }
+
             if (item.isExpandable) {
                 // Process nested expandable items (like health reports)
                 const processedSubItems = item.subItems?.map(subItem => {
+                    let subItemCount = 0;
+
+                    if (subItem.isExpandable && subItem.subItems) {
+                        // For nested expandable items, calculate from their sub-items
+                        subItemCount = calculateParentCount(subItem.subItems);
+                    } else {
+                        // Calculate count for this specific path
+                        subItemCount = calculateItemCounts(subItem.path);
+                    }
+
                     if (subItem.isExpandable) {
+                        const processedNestedSubItems = subItem.subItems?.map(nestedSubItem => {
+                            const nestedSubItemCount = calculateItemCounts(nestedSubItem.path);
+
+                            return {
+                                ...nestedSubItem,
+                                onClick: () => handleMenuItemClick(nestedSubItem.path),
+                                count: nestedSubItemCount,
+                                hasCount: nestedSubItemCount > 0,
+                            };
+                        }) || [];
+
                         return {
                             ...subItem,
                             onClick: () => toggleSection(subItem.sectionId),
@@ -306,15 +481,17 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                             expandIcon: expandedSections[subItem.sectionId]
                                 ? <ChevronUp size={14} />
                                 : <ChevronDown size={14} />,
-                            subItems: subItem.subItems?.map(nestedSubItem => ({
-                                ...nestedSubItem,
-                                onClick: () => onMenuItemClick(nestedSubItem.path),
-                            })) || [],
+                            subItems: processedNestedSubItems,
+                            count: subItemCount,
+                            hasCount: subItemCount > 0,
                         };
                     }
+
                     return {
                         ...subItem,
-                        onClick: () => onMenuItemClick(subItem.path),
+                        onClick: () => handleMenuItemClick(subItem.path),
+                        count: subItemCount,
+                        hasCount: subItemCount > 0,
                     };
                 });
 
@@ -326,14 +503,21 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                         ? <ChevronUp size={16} />
                         : <ChevronDown size={16} />,
                     subItems: processedSubItems || [],
+                    count: itemCount,
+                    hasCount: itemCount > 0,
                 };
             }
 
             return {
                 ...item,
-                onClick: () => onMenuItemClick(item.path),
+                onClick: () => handleMenuItemClick(item.path),
+                count: itemCount,
+                hasCount: itemCount > 0,
             };
         });
+
+        // Calculate total count for the entire section
+        const sectionCount = processedItems.reduce((total, item) => total + (item.count || 0), 0);
 
         return {
             ...section,
@@ -343,6 +527,8 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                 ? <ChevronUp size={16} />
                 : <ChevronDown size={16} />,
             items: processedItems,
+            count: sectionCount,
+            hasCount: false, // SET TO FALSE to hide badges on section headers
         };
     });
 
