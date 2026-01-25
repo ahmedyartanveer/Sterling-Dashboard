@@ -23,17 +23,15 @@ import {
     TablePagination,
     useMediaQuery,
     useTheme,
-    Select,
-    MenuItem,
     Switch,
     FormControlLabel,
     alpha,
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axiosInstance from '../../api/axios';
+import axiosInstance from '../../../api/axios';
 import { Helmet } from 'react-helmet-async';
-import DashboardLoader from '../../components/Loader/DashboardLoader';
-import OutlineButton from '../../components/ui/OutlineButton';
+import DashboardLoader from '../../../components/ui/GradientButton';
+
 
 // Import Lucide React icons
 import {
@@ -41,7 +39,6 @@ import {
     User,
     UserPlus,
     UserCog,
-    ShieldCheck,
     UserCheck,
     UserX,
     CheckCircle,
@@ -52,7 +49,8 @@ import {
     RefreshCw,
     X,
 } from 'lucide-react';
-import GradientButton from '../../components/ui/GradientButton';
+import OutlineButton from '../../../components/ui/OutlineButton';
+import GradientButton from '../../../components/ui/GradientButton';
 
 // Define color constants
 const TEXT_COLOR = '#0F1115';
@@ -62,7 +60,7 @@ const RED_COLOR = '#ef4444';
 const ORANGE_COLOR = '#ed6c02';
 const GRAY_COLOR = '#6b7280';
 
-export const UserManagement = () => {
+export const TechUser = () => {
     const queryClient = useQueryClient();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -85,15 +83,15 @@ export const UserManagement = () => {
         name: '',
         email: '',
         password: '',
-        role: 'manager',
+        role: 'tech',
         isActive: true,
     });
 
     const { data: users = [], isLoading } = useQuery({
-        queryKey: ['users'],
+        queryKey: ['tech-users-management'],
         queryFn: async () => {
-            const response = await axiosInstance.get('/users');
-            return response.data.users || response.data.data || response.data;
+            const response = await axiosInstance.get('/users/tech');
+            return response.data.data || response.data.users || response.data;
         },
         staleTime: 30000,
         refetchInterval: 60000,
@@ -145,14 +143,14 @@ export const UserManagement = () => {
             return response.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['users'] });
-            showSnackbar('User created successfully!', 'success');
+            queryClient.invalidateQueries({ queryKey: ['tech-users-management'] });
+            showSnackbar('Tech user created successfully!', 'success');
             setOpenDialog(false);
             resetForm();
             setPage(0);
         },
         onError: (err) => {
-            showSnackbar(err.response?.data?.message || 'Failed to create user', 'error');
+            showSnackbar(err.response?.data?.message || 'Failed to create tech user', 'error');
         },
     });
 
@@ -162,8 +160,8 @@ export const UserManagement = () => {
             return response.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['users'] });
-            showSnackbar('User deleted successfully!', 'success');
+            queryClient.invalidateQueries({ queryKey: ['tech-users-management'] });
+            showSnackbar('Tech user deleted successfully!', 'success');
             setOpenDeleteDialog(false);
             setUserToDelete(null);
             if (paginatedUsers.length === 1 && page > 0) {
@@ -171,7 +169,7 @@ export const UserManagement = () => {
             }
         },
         onError: (err) => {
-            showSnackbar(err.response?.data?.message || 'Failed to delete user', 'error');
+            showSnackbar(err.response?.data?.message || 'Failed to delete tech user', 'error');
             setOpenDeleteDialog(false);
             setUserToDelete(null);
         },
@@ -183,13 +181,13 @@ export const UserManagement = () => {
             return response.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['users'] });
-            showSnackbar('User updated successfully!', 'success');
+            queryClient.invalidateQueries({ queryKey: ['tech-users-management'] });
+            showSnackbar('Tech user updated successfully!', 'success');
             setOpenDialog(false);
             resetForm();
         },
         onError: (err) => {
-            showSnackbar(err.response?.data?.message || 'Failed to update user', 'error');
+            showSnackbar(err.response?.data?.message || 'Failed to update tech user', 'error');
         },
     });
 
@@ -199,13 +197,13 @@ export const UserManagement = () => {
             return response.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['users'] });
-            showSnackbar('User status updated successfully!', 'success');
+            queryClient.invalidateQueries({ queryKey: ['tech-users-management'] });
+            showSnackbar('Tech user status updated successfully!', 'success');
             setOpenStatusDialog(false);
             setUserToToggle(null);
         },
         onError: (err) => {
-            showSnackbar(err.response?.data?.message || 'Failed to update user status', 'error');
+            showSnackbar(err.response?.data?.message || 'Failed to update tech user status', 'error');
             setOpenStatusDialog(false);
             setUserToToggle(null);
         },
@@ -260,7 +258,7 @@ export const UserManagement = () => {
             name: '',
             email: '',
             password: '',
-            role: 'manager',
+            role: 'tech',
             isActive: true,
         });
     };
@@ -296,32 +294,11 @@ export const UserManagement = () => {
     };
 
     const getRoleStyle = (role) => {
-        switch (role) {
-            case 'superadmin':
-                return {
-                    backgroundColor: alpha(RED_COLOR, 0.08),
-                    color: RED_COLOR,
-                    border: `1px solid ${alpha(RED_COLOR, 0.3)}`,
-                };
-            case 'manager':
-                return {
-                    backgroundColor: alpha(BLUE_COLOR, 0.08),
-                    color: BLUE_COLOR,
-                    border: `1px solid ${alpha(BLUE_COLOR, 0.3)}`,
-                };
-            case 'tech':
-                return {
-                    backgroundColor: alpha(GREEN_COLOR, 0.08),
-                    color: GREEN_COLOR,
-                    border: `1px solid ${alpha(GREEN_COLOR, 0.3)}`,
-                };
-            default:
-                return {
-                    backgroundColor: alpha(GRAY_COLOR, 0.08),
-                    color: TEXT_COLOR,
-                    border: `1px solid ${alpha(GRAY_COLOR, 0.3)}`,
-                };
-        }
+        return {
+            backgroundColor: alpha(GREEN_COLOR, 0.08),
+            color: GREEN_COLOR,
+            border: `1px solid ${alpha(GREEN_COLOR, 0.3)}`,
+        };
     };
 
     const getStatusStyle = (isActive) => {
@@ -353,19 +330,10 @@ export const UserManagement = () => {
     };
 
     const getRoleIcon = (role) => {
-        switch (role) {
-            case 'superadmin':
-                return <ShieldCheck size={14} />;
-            case 'manager':
-                return <UserCog size={14} />;
-            case 'tech':
-                return <User size={14} />;
-            default:
-                return <User size={14} />;
-        }
+        return <UserCog size={14} />;
     };
 
-    // Search input component
+    // Search input component (consistent with other components)
     const SearchInput = ({ value, onChange, placeholder, color, fullWidth = false }) => {
         return (
             <Box sx={{ position: 'relative', width: fullWidth ? '100%' : 250 }}>
@@ -428,8 +396,8 @@ export const UserManagement = () => {
     return (
         <Box>
             <Helmet>
-                <title>User Management | Sterling Septic & Plumbing LLC</title>
-                <meta name="description" content="Manage users and their roles" />
+                <title>Tech User Management | Sterling Septic & Plumbing LLC</title>
+                <meta name="description" content="Manage tech users and their roles" />
             </Helmet>
 
             {/* Header */}
@@ -444,7 +412,7 @@ export const UserManagement = () => {
                             letterSpacing: '-0.01em',
                         }}
                     >
-                        User Management
+                        Tech User Management
                     </Typography>
                     <Typography
                         variant="body2"
@@ -454,15 +422,24 @@ export const UserManagement = () => {
                             fontWeight: 400,
                         }}
                     >
-                        Manage users and their roles
+                        Manage tech users and their roles
                     </Typography>
                 </Box>
                 <GradientButton
                     variant="contained"
                     startIcon={<UserPlus size={16} />}
                     onClick={() => handleOpenDialog()}
+                    sx={{
+                        textTransform: 'none',
+                        fontSize: isMobile ? '0.75rem' : '0.85rem',
+                        fontWeight: 500,
+                        backgroundColor: GREEN_COLOR,
+                        '&:hover': {
+                            backgroundColor: alpha(GREEN_COLOR, 0.9),
+                        },
+                    }}
                 >
-                    Add User
+                    Add Tech User
                 </GradientButton>
             </Box>
 
@@ -473,7 +450,7 @@ export const UserManagement = () => {
                     mb: 4,
                     borderRadius: '6px',
                     overflow: 'hidden',
-                    border: `1px solid ${alpha(BLUE_COLOR, 0.15)}`,
+                    border: `1px solid ${alpha(GREEN_COLOR, 0.15)}`,
                     bgcolor: 'white'
                 }}
             >
@@ -481,7 +458,7 @@ export const UserManagement = () => {
                     sx={{
                         p: isMobile ? 1 : 1.5,
                         bgcolor: 'white',
-                        borderBottom: `1px solid ${alpha(BLUE_COLOR, 0.1)}`,
+                        borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.1)}`,
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
@@ -503,13 +480,13 @@ export const UserManagement = () => {
                                 fontWeight: 600,
                             }}
                         >
-                            Users
+                            Tech Users
                             <Chip
                                 size="small"
                                 label={filteredUsers.length}
                                 sx={{
                                     ml: 1,
-                                    bgcolor: alpha(BLUE_COLOR, 0.08),
+                                    bgcolor: alpha(GREEN_COLOR, 0.08),
                                     color: TEXT_COLOR,
                                     fontSize: '0.75rem',
                                     fontWeight: 500,
@@ -538,8 +515,8 @@ export const UserManagement = () => {
                             <SearchInput
                                 value={searchQuery}
                                 onChange={setSearchQuery}
-                                placeholder="Search users..."
-                                color={BLUE_COLOR}
+                                placeholder="Search tech users..."
+                                color={GREEN_COLOR}
                                 fullWidth={isMobile}
                             />
                         </Box>
@@ -552,19 +529,19 @@ export const UserManagement = () => {
                         height: '8px',
                     },
                     '&::-webkit-scrollbar-track': {
-                        backgroundColor: alpha(BLUE_COLOR, 0.05),
+                        backgroundColor: alpha(GREEN_COLOR, 0.05),
                     },
                     '&::-webkit-scrollbar-thumb': {
-                        backgroundColor: alpha(BLUE_COLOR, 0.2),
+                        backgroundColor: alpha(GREEN_COLOR, 0.2),
                         borderRadius: '4px',
                     },
                 }}>
                     <Table size="small" sx={{ minWidth: isMobile ? 800 : 'auto' }}>
                         <TableHead>
                             <TableRow sx={{
-                                bgcolor: alpha(BLUE_COLOR, 0.04),
+                                bgcolor: alpha(GREEN_COLOR, 0.04),
                                 '& th': {
-                                    borderBottom: `2px solid ${alpha(BLUE_COLOR, 0.1)}`,
+                                    borderBottom: `2px solid ${alpha(GREEN_COLOR, 0.1)}`,
                                     py: 1.5,
                                     px: 1.5,
                                     fontSize: isMobile ? '0.75rem' : '0.8rem',
@@ -579,10 +556,10 @@ export const UserManagement = () => {
                                 <TableCell sx={{ minWidth: 180 }}>
                                     Email
                                 </TableCell>
-                                <TableCell sx={{ minWidth: 120 }}>
+                                <TableCell sx={{ minWidth: 100 }}>
                                     Role
                                 </TableCell>
-                                <TableCell sx={{ minWidth: 120 }}>
+                                <TableCell sx={{ minWidth: 100 }}>
                                     Status
                                 </TableCell>
                                 <TableCell align="right" sx={{ pr: isMobile ? 1.5 : 2.5, minWidth: 150 }}>
@@ -610,7 +587,7 @@ export const UserManagement = () => {
                                                     fontWeight: 500,
                                                 }}
                                             >
-                                                {searchQuery ? 'No users found matching your search.' : 'No users found. Create one to get started.'}
+                                                {searchQuery ? 'No tech users found matching your search.' : 'No tech users found. Create one to get started.'}
                                             </Typography>
                                         </Box>
                                     </TableCell>
@@ -623,7 +600,7 @@ export const UserManagement = () => {
                                         sx={{
                                             bgcolor: 'white',
                                             '&:hover': {
-                                                backgroundColor: alpha(BLUE_COLOR, 0.05),
+                                                backgroundColor: alpha(GREEN_COLOR, 0.05),
                                             },
                                             '&:last-child td': {
                                                 borderBottom: 'none',
@@ -639,7 +616,7 @@ export const UserManagement = () => {
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    background: `linear-gradient(135deg, ${alpha(BLUE_COLOR, 0.8)} 0%, ${BLUE_COLOR} 100%)`,
+                                                    background: `linear-gradient(135deg, ${alpha(GREEN_COLOR, 0.8)} 0%, ${GREEN_COLOR} 100%)`,
                                                     color: 'white',
                                                     fontWeight: 600,
                                                     fontSize: '0.8rem',
@@ -690,7 +667,7 @@ export const UserManagement = () => {
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                 {getRoleIcon(user.role)}
                                                 <Chip
-                                                    label={user.role.toUpperCase()}
+                                                    label="TECH"
                                                     size="small"
                                                     sx={{
                                                         fontWeight: 500,
@@ -724,7 +701,7 @@ export const UserManagement = () => {
                                         </TableCell>
                                         <TableCell align="right" sx={{ pr: isMobile ? 1.5 : 2.5, py: 1.5 }}>
                                             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
-                                                <Tooltip title="Edit User">
+                                                <Tooltip title="Edit Tech User">
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => handleOpenDialog(user)}
@@ -740,7 +717,7 @@ export const UserManagement = () => {
                                                         <Edit size={16} />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title={user.isActive ? "Deactivate User" : "Activate User"}>
+                                                <Tooltip title={user.isActive ? "Deactivate Tech User" : "Activate Tech User"}>
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => handleToggleStatusClick(user)}
@@ -758,7 +735,7 @@ export const UserManagement = () => {
                                                         {user.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title="Delete User">
+                                                <Tooltip title="Delete Tech User">
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => handleDeleteClick(user)}
@@ -792,7 +769,7 @@ export const UserManagement = () => {
                             onPageChange={handleChangePage}
                             onRowsPerPageChange={handleChangeRowsPerPage}
                             sx={{
-                                borderTop: `1px solid ${alpha(BLUE_COLOR, 0.1)}`,
+                                borderTop: `1px solid ${alpha(GREEN_COLOR, 0.1)}`,
                                 '& .MuiTablePagination-toolbar': {
                                     minHeight: '44px',
                                 },
@@ -805,7 +782,7 @@ export const UserManagement = () => {
                 </TableContainer>
             </Paper>
 
-            {/* Add/Edit User Dialog */}
+            {/* Add/Edit Tech User Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={handleCloseDialog}
@@ -815,19 +792,19 @@ export const UserManagement = () => {
                     sx: {
                         borderRadius: '8px',
                         bgcolor: 'white',
-                        border: `1px solid ${alpha(BLUE_COLOR, 0.15)}`,
+                        border: `1px solid ${alpha(GREEN_COLOR, 0.15)}`,
                     }
                 }}
             >
                 <DialogTitle sx={{
                     p: 2,
-                    borderBottom: `1px solid ${alpha(BLUE_COLOR, 0.1)}`,
+                    borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.1)}`,
                     bgcolor: 'white',
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                         {selectedUser ? (
                             <>
-                                <Edit size={18} color={BLUE_COLOR} />
+                                <Edit size={18} color={GREEN_COLOR} />
                                 <Typography
                                     sx={{
                                         fontSize: '0.95rem',
@@ -835,12 +812,12 @@ export const UserManagement = () => {
                                         fontWeight: 600,
                                     }}
                                 >
-                                    Edit User
+                                    Edit Tech User
                                 </Typography>
                             </>
                         ) : (
                             <>
-                                <UserPlus size={18} color={BLUE_COLOR} />
+                                <UserPlus size={18} color={GREEN_COLOR} />
                                 <Typography
                                     sx={{
                                         fontSize: '0.95rem',
@@ -848,7 +825,7 @@ export const UserManagement = () => {
                                         fontWeight: 600,
                                     }}
                                 >
-                                    Add New User
+                                    Add New Tech User
                                 </Typography>
                             </>
                         )}
@@ -885,8 +862,8 @@ export const UserManagement = () => {
                                     borderRadius: '6px',
                                     outline: 'none',
                                     '&:focus': {
-                                        borderColor: BLUE_COLOR,
-                                        boxShadow: `0 0 0 2px ${alpha(BLUE_COLOR, 0.1)}`,
+                                        borderColor: GREEN_COLOR,
+                                        boxShadow: `0 0 0 2px ${alpha(GREEN_COLOR, 0.1)}`,
                                     },
                                 }}
                             />
@@ -922,8 +899,8 @@ export const UserManagement = () => {
                                     borderRadius: '6px',
                                     outline: 'none',
                                     '&:focus': {
-                                        borderColor: BLUE_COLOR,
-                                        boxShadow: `0 0 0 2px ${alpha(BLUE_COLOR, 0.1)}`,
+                                        borderColor: GREEN_COLOR,
+                                        boxShadow: `0 0 0 2px ${alpha(GREEN_COLOR, 0.1)}`,
                                     },
                                 }}
                             />
@@ -959,55 +936,11 @@ export const UserManagement = () => {
                                     borderRadius: '6px',
                                     outline: 'none',
                                     '&:focus': {
-                                        borderColor: BLUE_COLOR,
-                                        boxShadow: `0 0 0 2px ${alpha(BLUE_COLOR, 0.1)}`,
+                                        borderColor: GREEN_COLOR,
+                                        boxShadow: `0 0 0 2px ${alpha(GREEN_COLOR, 0.1)}`,
                                     },
                                 }}
                             />
-                        </Box>
-
-                        <Box>
-                            <Typography
-                                variant="body2"
-                                sx={{
-                                    mb: 1,
-                                    color: TEXT_COLOR,
-                                    fontSize: '0.8rem',
-                                    fontWeight: 500,
-                                }}
-                            >
-                                Role
-                            </Typography>
-                            <Box
-                                component="select"
-                                name="role"
-                                value={formData.role}
-                                onChange={handleInputChange}
-                                sx={{
-                                    width: '100%',
-                                    fontSize: '0.85rem',
-                                    height: '40px',
-                                    padding: '0 12px',
-                                    border: `1px solid ${alpha(TEXT_COLOR, 0.1)}`,
-                                    borderRadius: '6px',
-                                    outline: 'none',
-                                    cursor: 'pointer',
-                                    '&:focus': {
-                                        borderColor: BLUE_COLOR,
-                                        boxShadow: `0 0 0 2px ${alpha(BLUE_COLOR, 0.1)}`,
-                                    },
-                                }}
-                            >
-                                <option value="manager">
-                                    Manager
-                                </option>
-                                <option value="superadmin">
-                                    Supper Admin
-                                </option>
-                                <option value="tech">
-                                    Tech
-                                </option>
-                            </Box>
                         </Box>
 
                         {selectedUser && (
@@ -1074,7 +1007,7 @@ export const UserManagement = () => {
                                 {selectedUser ? 'Updating...' : 'Creating...'}
                             </Box>
                         ) : (
-                            selectedUser ? 'Update User' : 'Create User'
+                            selectedUser ? 'Update Tech User' : 'Create Tech User'
                         )}
                     </GradientButton>
                 </DialogActions>
@@ -1122,7 +1055,7 @@ export const UserManagement = () => {
                                 lineHeight: 1.6,
                             }}
                         >
-                            Are you sure you want to delete the user <strong>"{userToDelete?.name}"</strong>?
+                            Are you sure you want to delete the tech user <strong>"{userToDelete?.name}"</strong>?
                             <br />
                             <span style={{ color: GRAY_COLOR, fontSize: '0.8rem' }}>
                                 This action cannot be undone.
@@ -1162,7 +1095,7 @@ export const UserManagement = () => {
                             <Trash2 size={16} />
                         )}
                     >
-                        {deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
+                        {deleteUserMutation.isPending ? 'Deleting...' : 'Delete Tech User'}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1214,7 +1147,7 @@ export const UserManagement = () => {
                             }}
                         >
                             Are you sure you want to {userToToggle?.isActive ? 'deactivate' : 'activate'}
-                            the user <strong>"{userToToggle?.name}"</strong>?
+                            the tech user <strong>"{userToToggle?.name}"</strong>?
                             <br />
                             <span style={{ color: GRAY_COLOR, fontSize: '0.8rem' }}>
                                 {userToToggle?.isActive
@@ -1258,7 +1191,7 @@ export const UserManagement = () => {
                         }}
                     >
                         {toggleUserStatusMutation.isPending ? 'Updating...' :
-                            userToToggle?.isActive ? 'Deactivate User' : 'Activate User'}
+                            userToToggle?.isActive ? 'Deactivate Tech User' : 'Activate Tech User'}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1352,4 +1285,4 @@ if (typeof document !== 'undefined') {
     document.head.appendChild(styleSheet);
 }
 
-export default UserManagement;
+export default TechUser;

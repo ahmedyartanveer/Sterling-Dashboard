@@ -2,12 +2,12 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { Helmet } from 'react-helmet-async';
 
-export const TechForms = () => {
+export const TeamDailyChecklist = () => {
   return (
     <Box>
       <Helmet>
-        <title>Forms | Sterling Septic & Plumbing LLC</title>
-        <meta name="description" content="Tech Forms page" />
+        <title>Team Daily Checklist | Sterling Septic & Plumbing LLC</title>
+        <meta name="description" content="Tech Team Daily Checklist page" />
       </Helmet>
       <Typography gutterBottom sx={{ mb: 4, fontSize: 14 }}>
         This Page Is Coming Soon....

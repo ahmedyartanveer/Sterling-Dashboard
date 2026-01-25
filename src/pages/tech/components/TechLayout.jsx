@@ -4,49 +4,47 @@ import DashboardLayout from '../../../components/DashboardLayout';
 import { TechMenuComponent } from './TechMenuComponent';
 
 export const TechLayout = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+    const navigate = useNavigate();
+    const location = useLocation();
 
-  const handleMenuItemClick = (path) => {
-    navigate(path);
-  };
+    const handleMenuItemClick = (path) => {
+        navigate(path);
+    };
 
-  // Get menu items from the component with section structure
-  const structuredMenuItems = TechMenuComponent({ onMenuItemClick: handleMenuItemClick });
+    const structuredMenuItems = TechMenuComponent({ onMenuItemClick: handleMenuItemClick });
 
-  // Function to determine the current page title based on route
-  const getPageTitle = () => {
-    const currentPath = location.pathname;
+    const getPageTitle = () => {
+        const currentPath = location.pathname;
+        
+        for (const section of structuredMenuItems) {
+            for (const item of section.items) {
+                if (currentPath === item.path) return item.text;
+                if (currentPath.startsWith(item.path + '/')) return item.text;
+                
+                if (item.subItems) {
+                    const subItem = item.subItems.find(sub => {
+                        if (currentPath === sub.path) return true;
+                        if (currentPath.startsWith(sub.path + '/')) return true;
+                        return false;
+                    });
+                    if (subItem) return subItem.text;
+                }
+            }
+        }
 
-    // Flatten all items to find current
-    const allItems = structuredMenuItems.flatMap(section => section.items);
+        if (currentPath === '/tech-dashboard') {
+            return 'Dashboard';
+        }
+        
+        return 'Tech Dashboard';
+    };
 
-    // Find the matching menu item
-    const menuItem = allItems.find(item => {
-      if (currentPath === item.path) return true;
-      // For nested routes (like /forms/edit/:id)
-      if (currentPath.startsWith(item.path + '/')) return true;
-      return false;
-    });
-
-    if (menuItem) {
-      return menuItem.text;
-    }
-
-    // Fallback titles for common routes
-    if (currentPath === '/tech-dashboard') {
-      return 'Dashboard';
-    }
-
-    return 'Technician Dashboard';
-  };
-
-  return (
-    <DashboardLayout
-      title={getPageTitle()}
-      menuItems={structuredMenuItems}
-    >
-      <Outlet />
-    </DashboardLayout>
-  );
+    return (
+        <DashboardLayout 
+            title={getPageTitle()} 
+            menuItems={structuredMenuItems}
+        >
+            <Outlet />
+        </DashboardLayout>
+    );
 };

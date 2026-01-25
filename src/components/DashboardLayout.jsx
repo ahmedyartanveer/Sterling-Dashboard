@@ -1269,7 +1269,7 @@ const DashboardLayout = ({ children, title, menuItems }) => {
             display: 'flex',
             flexDirection: 'column',
             p: { xs: 1, sm: 1 },
-            pt: { xs: 3, md: 2.5 },
+            pt: { xs: 1.5, md: 2.5 },
             overflow: 'hidden',
           }}
         >

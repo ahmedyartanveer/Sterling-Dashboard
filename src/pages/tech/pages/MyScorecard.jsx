@@ -2,12 +2,12 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { Helmet } from 'react-helmet-async';
 
-export const SubmitHealthReport = () => {
+export const MyScorecard = () => {
   return (
     <Box>
       <Helmet>
-        <title>Submit Health Report | Sterling Septic & Plumbing LLC</title>
-        <meta name="description" content="Tech Submit Health Report page" />
+        <title>My Scorecard | Sterling Septic & Plumbing LLC</title>
+        <meta name="description" content="Tech My Scorecard page" />
       </Helmet>
       <Typography gutterBottom sx={{ mb: 4, fontSize: 14 }}>
         This Page Is Coming Soon....

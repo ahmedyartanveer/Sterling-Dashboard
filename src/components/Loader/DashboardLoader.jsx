@@ -9,7 +9,7 @@ export default function DashboardLoader() {
                     mb: 3,
                     height: '2px',
                     position: 'absolute',
-                    top: {xs: 70.5, sm: 65},
+                    top: {xs: 59, sm: 65},
                     left: 0,
                     right: 0,
                     backgroundColor: '#E5E7EB',

@@ -1,67 +1,62 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-
-// Auth
 import { useAuth } from '../auth/AuthProvider';
 import { PrivateRoute } from '../auth/PrivateRoute';
 
-// Layouts
 import { SuperAdminLayout } from '../pages/superadmin/components/SuperAdminLayout';
 import { ManagerLayout } from '../pages/manager/components/ManagerLayout';
 import { TechLayout } from '../pages/tech/components/TechLayout';
 
-// Pages - Auth
 import { Login } from '../pages/login/Login';
 import { ErrorPage } from '../pages/error/ErrorPage';
 import { LoginRoute } from '../auth/LoginRoute';
 
-// Pages - Super Admin
-import { SuperAdminDashboard } from '../pages/superadmin/SuperAdminDashboard';
-import { SuperAdminProfile } from '../pages/superadmin/Profile';
-import { UserManagement } from '../pages/superadmin/UserManagement';
-import { TechUser } from '../pages/superadmin/TechUser';
-import { Overview } from '../pages/superadmin/Overview';
-import { Dispatch } from '../pages/superadmin/Dispatch';
-import { LogisticsMap } from '../pages/superadmin/LogisticsMap';
-import { Installations } from '../pages/superadmin/Installations';
-import { Repairs } from '../pages/superadmin/Repairs';
-import { Scheduling } from '../pages/superadmin/Scheduling';
-import { Performance } from '../pages/superadmin/Performance';
-import { Quotes } from '../pages/superadmin/Quotes';
-import { Leads } from '../pages/superadmin/Leads';
-import { VehiclesTools } from '../pages/superadmin/VehiclesTools';
-import { Inventory } from '../pages/superadmin/Inventory';
-import { RiskManagement } from '../pages/superadmin/RiskManagement';
-import { Scorecards } from '../pages/superadmin/Scorecards';
-import { Forms } from '../pages/superadmin/Forms';
-import { ReviewForms } from '../pages/superadmin/ReviewForms';
-import { Approvals } from '../pages/superadmin/Approvals';
-import { Training } from '../pages/superadmin/Training';
-import { Tasks } from '../pages/superadmin/Tasks';
-import { Library } from '../pages/superadmin/Library';
+import { SuperAdminDashboard } from '../pages/superadmin/pages/SuperAdminDashboard';
+import { SuperAdminProfile } from '../pages/superadmin/pages/Profile';
+import { UserManagement } from '../pages/superadmin/pages/UserManagement';
+import { TechUser } from '../pages/superadmin/pages/TechUser';
+import { Overview } from '../pages/superadmin/pages/Overview';
+import { Dispatch } from '../pages/superadmin/pages/Dispatch';
+import { LogisticsMap } from '../pages/superadmin/pages/LogisticsMap';
+import { Installations } from '../pages/superadmin/pages/Installations';
+import { Repairs } from '../pages/superadmin/pages/Repairs';
+import { Scheduling } from '../pages/superadmin/pages/Scheduling';
+import { Performance } from '../pages/superadmin/pages/Performance';
+import { Quotes } from '../pages/superadmin/pages/Quotes';
+import { Leads } from '../pages/superadmin/pages/Leads';
+import { VehiclesTools } from '../pages/superadmin/pages/VehiclesTools';
+import { Inventory } from '../pages/superadmin/pages/Inventory';
+import { RiskManagement } from '../pages/superadmin/pages/RiskManagement';
+import { Scorecards } from '../pages/superadmin/pages/Scorecards';
+import { Forms } from '../pages/superadmin/pages/Forms';
+import { ReviewForms } from '../pages/superadmin/pages/ReviewForms';
+import { Approvals } from '../pages/superadmin/pages/Approvals';
+import { Training } from '../pages/superadmin/pages/Training';
+import { Tasks } from '../pages/superadmin/pages/Tasks';
+import { Library } from '../pages/superadmin/pages/Library';
 
-// Pages - Manager
-import { ManagerDashboard } from '../pages/manager/ManagerDashboard';
-import { ManagerProfile } from '../pages/manager/Profile';
-import { TechUserManagement } from '../pages/manager/TechUserManagement';
-import Locates from '../pages/manager/locates/Locates';
-import RMEReports from '../pages/manager/HMIS/RMEReports';
-import RSSReports from '../pages/manager/HMIS/RSSReports';
-import TOSReports from '../pages/manager/HMIS/TOSReports';
+import { ManagerDashboard } from '../pages/manager/pages/ManagerDashboard';
+import { ManagerProfile } from '../pages/manager/pages/Profile';
+import { TechUserManagement } from '../pages/manager/pages/TechUserManagement';
+import Locates from '../pages/manager/pages/Locates';
+import RMEReports from '../pages/manager/pages/RMEReports';
+import RSSReports from '../pages/manager/pages/RSSReports';
+import TOSReports from '../pages/manager/pages/TOSReports';
 
-// Pages - Tech
-import { TechDashboard } from '../pages/tech/TechDashboard';
-import { TechProfile } from '../pages/tech/Profile';
-import { MyTasks } from '../pages/tech/MyTasks';
-import { MySchedule } from '../pages/tech/MySchedule';
-import { TechForms } from '../pages/tech/Forms';
-import { SubmitForm } from '../pages/tech/SubmitForm';
-import { HealthDepartmentReports } from '../pages/tech/HealthDepartmentReports';
-import { SubmitHealthReport } from '../pages/tech/SubmitHealthReport';
-import { TechRiskManagement } from '../pages/tech/RiskManagement';
-import { SubmitRiskAssessment } from '../pages/tech/SubmitRiskAssessment';
-import { Courses } from '../pages/tech/Courses';
 import Notifications from '../components/Notification/Notifications';
+
+import { MyScorecard } from '../pages/tech/pages/MyScorecard';
+import { TechProfile } from '../pages/tech/pages/Profile';
+import { TechDashboard } from '../pages/tech/pages/TechDashboard';
+import { ReportsRme } from '../pages/tech/pages/ReportsRme';
+import { VehiclesTrucks } from '../pages/tech/pages/VehiclesTrucks';
+import { VehiclesList } from '../pages/tech/pages/VehiclesList';
+import { VehiclesPhotos } from '../pages/tech/pages/VehiclesPhotos';
+import { VehiclesInventory } from '../pages/tech/pages/VehiclesInventory';
+import { TeamDailyChecklist } from '../pages/tech/pages/TeamDailyChecklist';
+import { ResourcesLibrary } from '../pages/tech/pages/ResourcesLibrary';
+
+
 
 
 export const AppRoutes = () => {
@@ -70,16 +65,13 @@ export const AppRoutes = () => {
   return (
     <Router>
       <Routes>
-        {/* ===================== Public Routes ===================== */}
         <Route path="/login" element={<LoginRoute><Login /></LoginRoute>} />
 
-        {/* ===================== Error Pages ===================== */}
         <Route path="/error" element={<ErrorPage />} />
         <Route path="/unauthorized" element={<ErrorPage type="unauthorized" />} />
         <Route path="/not-found" element={<ErrorPage type="not-found" />} />
         <Route path="/server-error" element={<ErrorPage type="server-error" />} />
 
-        {/* ===================== Dashboard Redirect ===================== */}
         <Route
           path="/dashboard"
           element={
@@ -91,21 +83,14 @@ export const AppRoutes = () => {
           }
         />
 
-        {/* ===================== Super Admin Routes ===================== */}
         <Route
           path="/super-admin-dashboard"
-          element={
-            <PrivateRoute requiredRoles={['superadmin']}>
-              <SuperAdminLayout />
-            </PrivateRoute>
-          }
+          element={<PrivateRoute requiredRoles={['superadmin']}><SuperAdminLayout /></PrivateRoute>}
         >
           <Route index element={<SuperAdminDashboard />} />
           <Route path="profile" element={<SuperAdminProfile />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="all-technicians" element={<TechUser />} />
-
-          {/* Pages */}
           <Route path="overview" element={<Overview />} />
           <Route path="dispatch" element={<Dispatch />} />
           <Route path="logistics-map" element={<LogisticsMap />} />
@@ -126,33 +111,22 @@ export const AppRoutes = () => {
           <Route path="tasks" element={<Tasks />} />
           <Route path="library" element={<Library />} />
 
-          {/* Health Dept Reports */}
           <Route path="health-department-report-tracking/rme" element={<RMEReports />} />
           <Route path="health-department-report-tracking/rss" element={<RSSReports />} />
           <Route path="health-department-report-tracking/tos" element={<TOSReports />} />
 
-          {/* Locates */}
           <Route path="locates" element={<Locates />} />
-
-          {/* Notifications */}
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ===================== Manager Routes ===================== */}
         <Route
           path="/manager-dashboard"
-          element={
-            <PrivateRoute requiredRoles={['manager']}>
-              <ManagerLayout />
-            </PrivateRoute>
-          }
+          element={<PrivateRoute requiredRoles={['manager']}><ManagerLayout /></PrivateRoute>}
         >
           <Route index element={<ManagerDashboard />} />
           <Route path="profile" element={<ManagerProfile />} />
           <Route path="all-technicians" element={<TechUserManagement />} />
           <Route path="locates" element={<Locates />} />
-
-          {/* Pages (Shared with Super Admin) */}
           <Route path="overview" element={<Overview />} />
           <Route path="dispatch" element={<Dispatch />} />
           <Route path="logistics-map" element={<LogisticsMap />} />
@@ -173,38 +147,33 @@ export const AppRoutes = () => {
           <Route path="tasks" element={<Tasks />} />
           <Route path="library" element={<Library />} />
 
-          {/* Health Dept Reports */}
           <Route path="health-department-report-tracking/rme" element={<RMEReports />} />
           <Route path="health-department-report-tracking/rss" element={<RSSReports />} />
           <Route path="health-department-report-tracking/tos" element={<TOSReports />} />
 
-          {/* Notifications */}
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ===================== Tech Routes ===================== */}
         <Route
           path="/tech-dashboard"
-          element={
-            <PrivateRoute requiredRoles={['tech']}>
-              <TechLayout />
-            </PrivateRoute>
-          }
+          element={<PrivateRoute requiredRoles={['tech']}><TechLayout /></PrivateRoute>}
         >
           <Route index element={<TechDashboard />} />
           <Route path="profile" element={<TechProfile />} />
-          <Route path="my-tasks" element={<MyTasks />} />
-          <Route path="my-schedule" element={<MySchedule />} />
-          <Route path="forms" element={<TechForms />} />
-          <Route path="forms/submit" element={<SubmitForm />} />
-          <Route path="health-department-reports" element={<HealthDepartmentReports />} />
-          <Route path="health-department-reports/submit" element={<SubmitHealthReport />} />
-          <Route path="risk-management" element={<TechRiskManagement />} />
-          <Route path="risk-management/submit" element={<SubmitRiskAssessment />} />
-          <Route path="courses" element={<Courses />} />
+          <Route path="my-scorecard" element={<MyScorecard />} />
+          <Route path="reports/rme" element={<ReportsRme />} />
+
+          <Route path="vehicles/trucks" element={<VehiclesTrucks />} />
+          <Route path="vehicles/list" element={<VehiclesList />} />
+          <Route path="vehicles/photos" element={<VehiclesPhotos />} />
+          <Route path="vehicles/inventory" element={<VehiclesInventory />} />
+
+          <Route path="team/daily-checklist" element={<TeamDailyChecklist />} />
+
+          <Route path="resources/library" element={<ResourcesLibrary />} />
+          <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ===================== Fallback Routes ===================== */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<ErrorPage type="not-found" />} />
       </Routes>
