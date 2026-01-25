@@ -12,7 +12,6 @@ import {
     Chip,
     Snackbar,
     Alert,
-    CircularProgress,
     Button,
     Tooltip,
     IconButton,
@@ -30,8 +29,6 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '../../../api/axios';
 import { Helmet } from 'react-helmet-async';
-import DashboardLoader from '../../../components/ui/GradientButton';
-
 
 // Import Lucide React icons
 import {
@@ -51,6 +48,7 @@ import {
 } from 'lucide-react';
 import OutlineButton from '../../../components/ui/OutlineButton';
 import GradientButton from '../../../components/ui/GradientButton';
+import DashboardLoader from '../../../components/Loader/DashboardLoader';
 
 // Define color constants
 const TEXT_COLOR = '#0F1115';
