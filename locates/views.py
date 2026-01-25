@@ -7,7 +7,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from django_filters import FilterSet
 from rest_framework.decorators import action
-from .models import WorkOrderToday, Locates
+from .models import WorkOrderToday, Locates, WorkOrderSeen, LocateSeen
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
@@ -15,7 +15,8 @@ from rest_framework import serializers
 from .serializers import (
     WorkOrderTodaySerializer, 
     LocatesSerializer, 
-    BulkUpdatePayloadSerializer
+    BulkUpdatePayloadSerializer,
+    BulkSeenSerializer
 )
 import subprocess, os, sys
 
@@ -77,6 +78,36 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
     search_fields = ['wo_number', 'full_address', 'technician', 'notes']
     ordering_fields = '__all__'
     ordering = ['-scheduled_date']
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+    
+    @action(detail=False, methods=['post'], url_path='mark-seen', permission_classes=[IsAuthenticated])
+    def bulk_mark_seen(self, request):
+        serializer = BulkSeenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        ids = serializer.validated_data['ids']
+
+        work_orders = WorkOrderToday.objects.filter(id__in=ids)
+
+        seen_objects = [
+            WorkOrderSeen(user=request.user, work_order=wo)
+            for wo in work_orders
+        ]
+
+        WorkOrderSeen.objects.bulk_create(
+            seen_objects,
+            ignore_conflicts=True
+        )
+
+        return Response({
+            "status": "success",
+            "marked_seen": work_orders.count()
+        })
+
     
     def _run_automation_script(self, script_name, argument, new_status):
         """
@@ -212,6 +243,37 @@ class LocatesViewSet(viewsets.ModelViewSet):
     queryset = Locates.objects.all().order_by('-created_at')
     serializer_class = LocatesSerializer
     permission_classes = [IsAuthenticated]
+    
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+    @action(detail=False, methods=['post'], url_path='mark-seen', permission_classes=[IsAuthenticated])
+    def bulk_mark_seen(self, request):
+        serializer = BulkSeenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        ids = serializer.validated_data['ids']
+
+        locates = Locates.objects.filter(id__in=ids)
+
+        seen_objects = [
+            LocateSeen(user=request.user, locate=loc)
+            for loc in locates
+        ]
+
+        # 🚀 Ignore already seen
+        LocateSeen.objects.bulk_create(
+            seen_objects,
+            ignore_conflicts=True
+        )
+
+        return Response({
+            "status": "success",
+            "marked_seen": locates.count()
+        })
 
     # 1. GET ALL (Overriding list method)
     # Equivalent to: get_all_locates_data

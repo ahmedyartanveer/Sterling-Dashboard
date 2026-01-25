@@ -1,5 +1,8 @@
 from django.db import models
 from django.utils import timezone
+from accounts.models import User
+
+
 
 
 class WorkOrderToday(models.Model):
@@ -50,8 +53,6 @@ class WorkOrderToday(models.Model):
     # Report Reference
     report_id = models.CharField(max_length=100, null=True, blank=True, help_text="Associated Report ID")
     
-    is_seen = models.BooleanField(default=False, help_text="Indicates if this work order has been seen")
-    
 
     def __str__(self):
         # Returns the WO number or ID as the string representation
@@ -61,6 +62,29 @@ class WorkOrderToday(models.Model):
         verbose_name = "Work Order"
         verbose_name_plural = "Work Orders"
         ordering = ['-elapsed_time']
+
+
+
+class WorkOrderSeen(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE
+    )
+    work_order = models.ForeignKey(
+        WorkOrderToday,
+        on_delete=models.CASCADE,
+        related_name='seen_by'
+    )
+    seen_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'work_order')
+        indexes = [
+            models.Index(fields=['user', 'work_order'])
+        ]
+
+    def __str__(self):
+        return f"{self.user} seen {self.work_order_id}"
 
 
 class Locates(models.Model):
@@ -101,7 +125,6 @@ class Locates(models.Model):
     deleted_date = models.DateTimeField(blank=True, null=True)
     is_deleted = models.BooleanField(default=False)
     
-    is_seen = models.BooleanField(default=False, help_text="Indicates if this locate record has been seen")
     
     scraped_at = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -115,3 +138,26 @@ class Locates(models.Model):
 
     def __str__(self):
         return f"{self.work_order_number} - {self.customer_name}"
+
+
+
+class LocateSeen(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE
+    )
+    locate = models.ForeignKey(
+        Locates,
+        on_delete=models.CASCADE,
+        related_name='seen_by'
+    )
+    seen_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'locate')
+        indexes = [
+            models.Index(fields=['user', 'locate'])
+        ]
+
+    def __str__(self):
+        return f"{self.user} seen locate {self.locate_id}"

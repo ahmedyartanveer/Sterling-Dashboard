@@ -1,15 +1,41 @@
 from rest_framework import serializers
-from .models import WorkOrderToday, Locates
+from .models import WorkOrderToday, WorkOrderSeen, Locates, LocateSeen
 
 class WorkOrderTodaySerializer(serializers.ModelSerializer):
+    is_seen = serializers.SerializerMethodField()
+
     class Meta:
         model = WorkOrderToday
         fields = '__all__'
 
+    def get_is_seen(self, obj):
+        user = self.context['request'].user
+        return WorkOrderSeen.objects.filter(
+            user=user,
+            work_order=obj
+        ).exists()
+
 class LocatesSerializer(serializers.ModelSerializer):
+    is_seen = serializers.SerializerMethodField()
+
     class Meta:
         model = Locates
         fields = '__all__'
+
+    def get_is_seen(self, obj):
+        user = self.context['request'].user
+        return LocateSeen.objects.filter(
+            user=user,
+            locate=obj
+        ).exists()
+
+
+class BulkSeenSerializer(serializers.Serializer):
+    ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=False
+    )
+
 
 # --- Bulk Update Serializers ---
 
