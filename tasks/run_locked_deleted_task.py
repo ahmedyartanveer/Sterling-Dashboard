@@ -2,7 +2,7 @@ import sys
 import asyncio
 import os
 from automation.scrapers.online_rme_scraper import OnlineRMEScraper
-from automation.utils.address_helpers import extract_address_details
+from tasks.helper.edit_task import OnlineRMEEditTaskHelper
 
 # ==========================================
 # Force Unbuffered Output (Critical for Server Logs)
@@ -35,10 +35,12 @@ def log_warning(message):
 # ==========================================
 # Main Task Class
 # ==========================================
-class OnlineRMELocedTask(OnlineRMEScraper):
+class OnlineRMELocedDeletedTask(OnlineRMEScraper, OnlineRMEEditTaskHelper):
     def __init__(self):
         super().__init__()
         log_info("OnlineRMELocedTask initialized.")
+        # self.scrape_edit_form_data()
+        # self.populate_form_data()
     
     async def address_match_and_lock_task(self, full_address: str, new_status:str) -> bool:
         """Checks if the address exists in the work history table and locks it if found."""
@@ -204,7 +206,7 @@ async def main():
     exit_code = 1 
 
     try:
-        scraper = OnlineRMELocedTask()
+        scraper = OnlineRMELocedDeletedTask()
         task_result = await scraper.run(wo_address, new_status)
         
         if task_result:
@@ -239,7 +241,7 @@ async def main():
     return exit_code
 
 
-def start_lock_task():
+def start_locked_deleted_task():
     """Initialize and start the scraping process."""
     # Using simple print with flush to guarantee visibility in server logs
     print("\n" + "="*50, flush=True)
@@ -269,4 +271,4 @@ def start_lock_task():
 
 
 if __name__ == "__main__":
-    start_lock_task()
+    start_locked_deleted_task()

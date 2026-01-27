@@ -7,7 +7,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from django_filters import FilterSet
 from rest_framework.decorators import action
-from .models import WorkOrderToday, Locates, WorkOrderSeen, LocateSeen
+from .models import WorkOrderToday, Locates, WorkOrderSeen, LocateSeen, WorkOrderTodayEdit
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
@@ -16,7 +16,8 @@ from .serializers import (
     WorkOrderTodaySerializer, 
     LocatesSerializer, 
     BulkUpdatePayloadSerializer,
-    BulkSeenSerializer
+    BulkSeenSerializer,
+    WorkOrderTodayEditSerializer
 )
 import subprocess, os, sys
 
@@ -515,3 +516,28 @@ class UnifiedBulkUpdateView(APIView):
                 "locates": updated_locates
             }
         }, status=status.HTTP_200_OK)
+
+
+
+class WorkOrderTodayEditViewSet(viewsets.ModelViewSet):
+    queryset = WorkOrderTodayEdit.objects.all()
+    serializer_class = WorkOrderTodayEditSerializer
+    lookup_field = 'work_order_today_id' 
+
+    # --- 1. Custom GET Method (Single Data) ---
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+        except:
+             return Response({"detail": "No data found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+        return Response(data)
+
+    # --- 2. Custom PATCH Method (Update specific fields) ---
+    def partial_update(self, request, *args, **kwargs):
+        response = super().partial_update(request, *args, **kwargs)
+        
+        return response
+

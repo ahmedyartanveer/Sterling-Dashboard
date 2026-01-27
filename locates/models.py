@@ -62,6 +62,25 @@ class WorkOrderToday(models.Model):
         verbose_name = "Work Order"
         verbose_name_plural = "Work Orders"
         ordering = ['-elapsed_time']
+        
+
+class WorkOrderTodayEdit(models.Model):
+    work_order_today = models.OneToOneField(
+        'WorkOrderToday', 
+        on_delete=models.CASCADE,
+        related_name='edit_data' 
+    )
+    form_data = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Work Order Today Edit"
+        verbose_name_plural = "Work Order Edits" 
+        ordering = ['-id']
+
+    def __str__(self):
+        return f"Edit History for WorkOrder {self.work_order_today_id}"
 
 
 

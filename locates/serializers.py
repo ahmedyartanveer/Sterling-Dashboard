@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import WorkOrderToday, WorkOrderSeen, Locates, LocateSeen
+from .models import WorkOrderToday, WorkOrderTodayEdit, WorkOrderSeen, Locates, LocateSeen
 
 class WorkOrderTodaySerializer(serializers.ModelSerializer):
     is_seen = serializers.SerializerMethodField()
@@ -57,3 +57,10 @@ class BulkUpdatePayloadSerializer(serializers.Serializer):
         allow_empty=True,
         help_text="List of Locates objects to update. Must include 'id'."
     )
+
+
+class WorkOrderTodayEditSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkOrderTodayEdit
+        fields = '__all__' 
+        read_only_fields = ['created_at', 'updated_at']
