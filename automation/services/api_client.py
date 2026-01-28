@@ -278,7 +278,7 @@ class APIClient:
         if not self._ensure_authenticated():
             return None
 
-        url = f"{self.base_url}work-order-edit/{work_order_today_id}/"
+        url = f"{self.base_url}work-order-edit/{work_order_today_id}/?status=UPDATE"
 
         payload = {
             "form_data": form_data,

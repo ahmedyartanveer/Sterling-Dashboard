@@ -1,6 +1,6 @@
 import sys
 import asyncio
-import os
+import os, json
 from automation.scrapers.online_rme_scraper import OnlineRMEScraper
 from tasks.helper.edit_task import OnlineRMEEditTaskHelper
 
@@ -141,18 +141,19 @@ class OnlineRMELocedDeletedTask(OnlineRMEScraper, OnlineRMEEditTaskHelper):
                                 await self.page.wait_for_timeout(2000) 
                                 log_success(f"DELETED successfully.")
                                 return True
-                            elif new_status == "GET":
-                                log_info("Edit...********************************************")
+                            elif new_status == "GET" or new_status == "UPDATE":
                                 get_item = columns.nth(10) 
                                 click_item = get_item.locator('input')
                                 log_info("Attempting to click Edit...")
                                 await click_item.click(timeout=5000)
                                 await self.page.wait_for_load_state("networkidle", timeout=20000) 
-                                form_data = await self.scrape_edit_form_data()
-                                log_info(f"{form_data}********************************************")
-                                if len(form_data) != 0:
-                                   result = self.api_client.work_order_today_edit(form_data, int(work_order_edit_id))
-                                   return True if result else False
+                                if new_status == "GET":
+                                    form_data = await self.scrape_edit_form_data()
+                                    if len(form_data) != 0:
+                                        result = self.api_client.work_order_today_edit(form_data, int(work_order_edit_id))
+                                        return True if result else False
+                                elif new_status == "UPDATE":
+                                    pass
                                 return False
                             else:
                                 log_error(f"Invalid status provided: {new_status}")
@@ -212,9 +213,11 @@ async def main():
     wo_address = sys.argv[1]
     new_status = sys.argv[2]
     work_order_edit_id = sys.argv[3]
+    form_data = json.loads(sys.argv[4])
     log_info(f"Processing Work Order Address: {wo_address}")
     log_info(f"Processing Work Order Status: {new_status}")
     log_info(f"Processing Work Order ID: {work_order_edit_id}")
+    log_info(f"Processing Work Order Update Body: {form_data}")
 
     scraper = None
     exit_code = 1 
