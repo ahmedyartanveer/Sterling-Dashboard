@@ -42,7 +42,7 @@ class OnlineRMELocedDeletedTask(OnlineRMEScraper, OnlineRMEEditTaskHelper):
         # self.scrape_edit_form_data()
         # self.populate_form_data()
     
-    async def address_match_and_lock_task(self, full_address: str, new_status:str) -> bool:
+    async def address_match_and_lock_task(self, full_address: str, new_status:str, work_order_edit_id:str) -> bool:
         """Checks if the address exists in the work history table and locks it if found."""
         log_info(f"Starting address match process for: {full_address}")
         
@@ -141,7 +141,19 @@ class OnlineRMELocedDeletedTask(OnlineRMEScraper, OnlineRMEEditTaskHelper):
                                 await self.page.wait_for_timeout(2000) 
                                 log_success(f"DELETED successfully.")
                                 return True
-
+                            elif new_status == "GET":
+                                log_info("Edit...********************************************")
+                                get_item = columns.nth(10) 
+                                click_item = get_item.locator('input')
+                                log_info("Attempting to click Edit...")
+                                await click_item.click(timeout=5000)
+                                await self.page.wait_for_load_state("networkidle", timeout=20000) 
+                                form_data = await self.scrape_edit_form_data()
+                                log_info(f"{form_data}********************************************")
+                                if len(form_data) != 0:
+                                   result = self.api_client.work_order_today_edit(form_data, int(work_order_edit_id))
+                                   return True if result else False
+                                return False
                             else:
                                 log_error(f"Invalid status provided: {new_status}")
                                 return False
@@ -156,7 +168,7 @@ class OnlineRMELocedDeletedTask(OnlineRMEScraper, OnlineRMEEditTaskHelper):
             log_error(f"Critical Error in address_match_and_lock_task: {e}")
             return False
         
-    async def run(self, full_address: str, new_status:str):
+    async def run(self, full_address: str, new_status:str, work_order_edit_id:str):
         log_info("Run method called. Initializing setup...")
         
         if not self.page:
@@ -182,7 +194,7 @@ class OnlineRMELocedDeletedTask(OnlineRMEScraper, OnlineRMEEditTaskHelper):
             if not full_address:
                 log_warning("Skipping: No address provided.")
                 return False
-            return await self.address_match_and_lock_task(full_address, new_status)
+            return await self.address_match_and_lock_task(full_address, new_status, work_order_edit_id)
             
         except Exception as e:
             log_error(f"Locked Task Run Error: {e}")
@@ -199,15 +211,17 @@ async def main():
 
     wo_address = sys.argv[1]
     new_status = sys.argv[2]
+    work_order_edit_id = sys.argv[3]
     log_info(f"Processing Work Order Address: {wo_address}")
     log_info(f"Processing Work Order Status: {new_status}")
+    log_info(f"Processing Work Order ID: {work_order_edit_id}")
 
     scraper = None
     exit_code = 1 
 
     try:
         scraper = OnlineRMELocedDeletedTask()
-        task_result = await scraper.run(wo_address, new_status)
+        task_result = await scraper.run(wo_address, new_status, work_order_edit_id)
         
         if task_result:
             log_success("Task Completed Successfully.")

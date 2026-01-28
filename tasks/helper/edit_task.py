@@ -64,8 +64,9 @@ class OnlineRMEEditTaskHelper:
         
         try:
             # Wait for table
+            # //table[@id='GridViewPump'] | //table[@id='ctl00_DataGridQuestions']
             await self.page.wait_for_selector(
-                '#ctl00_DataGridQuestions', 
+                "//table[@id='GridViewPump'] | //table[@id='ctl00_DataGridQuestions']", 
                 state='attached', 
                 timeout=6000
             )
@@ -76,18 +77,18 @@ class OnlineRMEEditTaskHelper:
         # Load JS content
         js_script = self._load_js_script('scrape_form.js')
         if not js_script:
-            return ["Not found : scrape_form.js"]
+            return []
 
         try:
             # Execute JS
             form_data = await self.page.evaluate(js_script)
-            
+            form_data = form_data if form_data else []
             log_success(f"Scraped {len(form_data)} form fields successfully.")
-            return form_data
+            return form_data  
 
         except Exception as e:
             log_error(f"Error during form scraping execution: {e}")
-            return ["ANIK********************"]
+            return []
     
     async def populate_form_data(self, json_data):
         """

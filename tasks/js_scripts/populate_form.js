@@ -39,50 +39,122 @@
     };
 
     // ==========================================
-    // MAIN POPULATION LOGIC
+    // Determine which form type we're dealing with
+    // ==========================================
+    const isFormType1 = document.getElementById('ctl00_DataGridQuestions') !== null;
+    const isFormType2 = document.getElementById('GridViewPump') !== null;
+
+    // ==========================================
+    // MAIN POPULATION LOGIC - FORM TYPE 1
     // ==========================================
     
-    const table = document.getElementById('ctl00_DataGridQuestions');
-    const rows = table ? table.getElementsByTagName('tr') : [];
+    if (isFormType1) {
+        const table = document.getElementById('ctl00_DataGridQuestions');
+        const rows = table ? table.getElementsByTagName('tr') : [];
 
-    data.forEach(item => {
-        let foundInTable = false;
+        data.forEach(item => {
+            let foundInTable = false;
 
-        // 1. Update Main Data Grid (Questions table)
-        if (table) {
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const questionSpan = row.querySelector('span[id$="_txtQuestion"]');
+            // 1. Update Main Data Grid (Questions table)
+            if (table) {
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    const questionSpan = row.querySelector('span[id$="_txtQuestion"]');
 
-                if (questionSpan && questionSpan.innerText.trim() === item.name) {
-                    foundInTable = true;
+                    if (questionSpan && questionSpan.innerText.trim() === item.name) {
+                        foundInTable = true;
 
-                    if (item.type === 'select') {
-                        const selectBox = row.querySelector('select');
-                        setSelectByText(selectBox, item.selected);
-                    } else if (item.type === 'text') {
-                        const inputBox = row.querySelector('input[type="text"]');
-                        setInputValue(inputBox, item.value);
+                        if (item.type === 'select') {
+                            const selectBox = row.querySelector('select');
+                            setSelectByText(selectBox, item.selected);
+                        } else if (item.type === 'text') {
+                            const inputBox = row.querySelector('input[type="text"]');
+                            setInputValue(inputBox, item.value);
+                        }
+                        break;
                     }
-                    break;
                 }
             }
-        }
 
-        // 2. Update Footer Fields (if not found in table)
-        if (!foundInTable) {
-            if (item.name.includes("OVERALL COMMENTS")) {
-                const commentBox = document.getElementById('ctl01_txtComments');
-                setInputValue(commentBox, item.value);
+            // 2. Update Footer Fields (if not found in table)
+            if (!foundInTable) {
+                if (item.name.includes("OVERALL COMMENTS")) {
+                    const commentBox = document.getElementById('ctl01_txtComments');
+                    setInputValue(commentBox, item.value);
+                }
+                else if (item.name.includes("Correction status")) {
+                    const correctionBox = document.getElementById('ctl01_drpCorrectionStatus');
+                    setSelectByText(correctionBox, item.selected);
+                }
+                else if (item.name.includes("Fieldwork performed by")) {
+                    const fieldWorkBox = document.getElementById('ctl01_drpFieldworkPerformedBy');
+                    setSelectByText(fieldWorkBox, item.selected);
+                }
             }
-            else if (item.name.includes("Correction status")) {
-                const correctionBox = document.getElementById('ctl01_drpCorrectionStatus');
-                setSelectByText(correctionBox, item.selected);
+        });
+    }
+
+    // ==========================================
+    // MAIN POPULATION LOGIC - FORM TYPE 2
+    // ==========================================
+    
+    if (isFormType2) {
+        const table = document.getElementById('GridViewPump');
+        const rows = table ? table.getElementsByTagName('tr') : [];
+
+        data.forEach(item => {
+            let foundInTable = false;
+
+            // 1. Update Main Data Grid (GridViewPump table)
+            if (table) {
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    const cells = row.getElementsByTagName('td');
+                    
+                    if (cells.length >= 2) {
+                        const firstCell = cells[0];
+                        const questionText = firstCell.innerText.trim();
+
+                        if (questionText === item.name) {
+                            foundInTable = true;
+                            const secondCell = cells[1];
+
+                            if (item.type === 'select') {
+                                const selectBox = secondCell.querySelector('select');
+                                setSelectByText(selectBox, item.selected);
+                            } else if (item.type === 'text') {
+                                const inputBox = secondCell.querySelector('input[type="text"]');
+                                setInputValue(inputBox, item.value);
+                            }
+                            break;
+                        }
+                    }
+                }
             }
-            else if (item.name.includes("Fieldwork performed by")) {
-                const fieldWorkBox = document.getElementById('ctl01_drpFieldworkPerformedBy');
-                setSelectByText(fieldWorkBox, item.selected);
+
+            // 2. Update Footer Fields (if not found in table)
+            if (!foundInTable) {
+                if (item.name.includes("OVERALL COMMENTS")) {
+                    const commentBox = document.getElementById('txtComments');
+                    setInputValue(commentBox, item.value);
+                }
+                else if (item.name.includes("Correction status")) {
+                    const correctionBox = document.getElementById('drpCorrectionStatus');
+                    setSelectByText(correctionBox, item.selected);
+                }
+                else if (item.name.includes("Fieldwork performed by")) {
+                    const fieldWorkBox = document.getElementById('txtFieldworkPerformedBy');
+                    setInputValue(fieldWorkBox, item.value);
+                }
+                else if (item.name.includes("Proposed dump location") && item.name.includes("State")) {
+                    const stateBox = document.getElementById('drpState');
+                    setSelectByText(stateBox, item.selected);
+                }
+                else if (item.name.includes("Dump Location Detail")) {
+                    const dumpLocationBox = document.getElementById('drpDumpLocation');
+                    setSelectByText(dumpLocationBox, item.selected);
+                }
             }
-        }
-    });
+        });
+    }
 }

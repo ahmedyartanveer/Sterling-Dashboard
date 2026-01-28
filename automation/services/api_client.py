@@ -261,3 +261,60 @@ class APIClient:
         except requests.RequestException as e:
             print(f"Connection error during {method}: {e}")
             return None
+    
+    
+    def work_order_today_edit(self, form_data, work_order_today_id):
+        """
+        Update work order today edit data (PATCH).
+
+        Args:
+            edit_id (int): work-order-edit record ID
+            form_data (dict): form data to update
+            work_order_today_id (int): related work_order_today ID
+
+        Returns:
+            dict | None: API response or None if failed
+        """
+        if not self._ensure_authenticated():
+            return None
+
+        url = f"{self.base_url}work-order-edit/{work_order_today_id}/"
+
+        payload = {
+            "form_data": form_data,
+            "work_order_today": work_order_today_id
+        }
+
+        print(f"Sending PATCH request to: {url}")
+
+        try:
+            response = requests.patch(
+                url=url,
+                json=payload,
+                headers=self.headers,
+                timeout=60
+            )
+
+            result = self._handle_response(response, "PATCH")
+
+            # 🔄 Retry once if token expired
+            if result is None and response.status_code == 401:
+                print("🔄 Retrying PATCH with fresh token...")
+
+                if self._ensure_authenticated():
+                    response = requests.patch(
+                        url=url,
+                        json=payload,
+                        headers=self.headers,
+                        timeout=60
+                    )
+                    result = self._handle_response(response, "PATCH")
+
+            return result
+
+        except requests.Timeout:
+            print("PATCH request timed out.")
+            return None
+        except requests.RequestException as e:
+            print(f"Connection error during PATCH: {e}")
+            return None

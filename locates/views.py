@@ -21,6 +21,8 @@ from .serializers import (
 )
 import subprocess, os, sys
 
+
+
 class WorkOrderTodayFilter(FilterSet):
     class Meta:
         model = WorkOrderToday
@@ -124,7 +126,7 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
         env["PYTHONPATH"] = os.getcwd()
 
         return subprocess.run(
-            [sys.executable, script_path, str(argument), str(new_status)],
+            [sys.executable, script_path, str(argument), str(new_status), '0'],
             check=True,
             env=env
         )
@@ -140,8 +142,8 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
         
         # Map specific statuses to their corresponding automation scripts
         automation_map = {
-            'LOCKED': 'run_locked_deleted_task.py',
-            'DELETED': 'run_locked_deleted_task.py'
+            'LOCKED': 'run_locked_deleted_edit_task.py',
+            'DELETED': 'run_locked_deleted_edit_task.py'
         }
 
         # Check if automation is required for the new status
@@ -523,13 +525,75 @@ class WorkOrderTodayEditViewSet(viewsets.ModelViewSet):
     queryset = WorkOrderTodayEdit.objects.all()
     serializer_class = WorkOrderTodayEditSerializer
     lookup_field = 'work_order_today_id' 
+    
+    
+    def _run_automation_script(self, script_name, argument, new_status, work_order_today_id):
+        """
+        Helper method to execute external automation scripts.
+        Raises CalledProcessError if the script fails.
+        """
+        
+        print(">>> ABOUT TO START AUTOMATION <<<", flush=True)
+        script_path = os.path.join(os.getcwd(), 'tasks', script_name)
+        
+        # Inject current working directory to PYTHONPATH to ensure imports work
+        env = os.environ.copy()
+        env["PYTHONPATH"] = os.getcwd()
+
+        return subprocess.run(
+            [sys.executable, script_path, str(argument), str(new_status), str(work_order_today_id)],
+            check=True,
+            env=env
+        )
 
     # --- 1. Custom GET Method (Single Data) ---
     def retrieve(self, request, *args, **kwargs):
+        status_query = request.query_params.get('status')
         try:
             instance = self.get_object()
         except:
-             return Response({"detail": "No data found."}, status=status.HTTP_404_NOT_FOUND)
+            work_order_today_id = kwargs.get('work_order_today_id', None)
+            if work_order_today_id:
+                try:
+                    work_order_today = WorkOrderToday.objects.get(id=work_order_today_id)
+                    if work_order_today:
+                        WorkOrderTodayEdit.objects.create(
+                            form_data={},
+                            work_order_today=work_order_today
+                        )
+                    else:
+                        return Response(
+                            {
+                                "status": "failed",
+                                "message": f"Not Found Work Order",
+                            },
+                            status=status.HTTP_400_BAD_REQUEST
+                        )  
+                except Exception as e:
+                    return Response({"detail": "Work Order Today No data found."}, status=status.HTTP_404_NOT_FOUND)
+                full_address = work_order_today.full_address
+                
+                script_name = 'run_locked_deleted_edit_task.py'
+                print(f"Starting automation: {script_name} for ID: {work_order_today.id}")
+
+                try:
+                    # Run the script before saving to the database
+                    result = self._run_automation_script(script_name, full_address, "GET", work_order_today_id)
+                    print(f"Automation Success: {10}")
+                    return Response({"detail": "Automation Success"}, status=status.HTTP_200_OK)
+                except subprocess.CalledProcessError as e:
+                    # Automation failed; abort the database update and return error
+                    print(f"Automation Failed: {e.stderr}")
+                    return Response(
+                        {
+                            "status": "failed",
+                            "message": f"Automation failed for status GET. Database was NOT updated.",
+                            "details": e.stderr
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )  
+            else:
+                return Response({"detail": "No data found."}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = self.get_serializer(instance)
         data = serializer.data
