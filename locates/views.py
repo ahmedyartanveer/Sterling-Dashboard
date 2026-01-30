@@ -113,12 +113,19 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
         })
 
     
-    def _run_automation_script(self, script_name, argument, new_status):
+    def _run_automation_script(self, script_name, argument, new_status, work_order_today_id, form_data):
         """
         Helper method to execute external automation scripts.
         Raises CalledProcessError if the script fails.
         """
-        
+        if form_data is None:
+            form_data = {"test": "0"}
+        def json_safe(obj):
+            if isinstance(obj, bytes):
+                return obj.decode("utf-8", errors="ignore")
+            return str(obj)
+
+        payload = json.dumps(form_data, default=json_safe)
         print(">>> ABOUT TO START AUTOMATION <<<", flush=True)
         script_path = os.path.join(os.getcwd(), 'tasks', script_name)
         
@@ -127,7 +134,7 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
         env["PYTHONPATH"] = os.getcwd()
 
         return subprocess.run(
-            [sys.executable, script_path, str(argument), str(new_status), '0', json.dumps({"test": "0"})],
+            [sys.executable, script_path, str(argument), str(new_status), str(work_order_today_id), payload],
             check=True,
             env=env
         )
@@ -154,7 +161,7 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
 
             try:
                 # Run the script before saving to the database
-                result = self._run_automation_script(script_name, instance.full_address, new_status)
+                result = self._run_automation_script(script_name, instance.full_address, new_status, 0, None)
                 print(f"Automation Success: {result.stdout}")
 
             except subprocess.CalledProcessError as e:
@@ -606,43 +613,43 @@ class WorkOrderTodayEditViewSet(viewsets.ModelViewSet):
 
     # --- 2. Custom PATCH Method (Update specific fields) ---
     def partial_update(self, request, *args, **kwargs):
-        # status_query = request.query_params.get('status')
+        status_query = request.query_params.get('status')
 
         response = super().partial_update(request, *args, **kwargs)
-        # instance = self.get_object()   # 🔥 actual model instance
+        instance = self.get_object()   # 🔥 actual model instance
 
-        # if not status_query:
-        #     work_order_today = instance.work_order_today
-        #     full_address = work_order_today.full_address
-        #     work_order_today_id = work_order_today.id
-        #     script_name = 'run_locked_deleted_edit_task.py'
-        #     print(f"Starting automation: {script_name} for ID: {instance.id}")
+        if not status_query:
+            work_order_today = instance.work_order_today
+            full_address = work_order_today.full_address
+            work_order_today_id = work_order_today.id
+            script_name = 'run_locked_deleted_edit_task.py'
+            print(f"Starting automation: {script_name} for ID: {instance.id}")
 
-        #     try:
-        #         # Run the script before saving to the database
-        #         serializer = self.get_serializer(instance)
-        #         json_data = JSONRenderer().render(serializer.data)
-        #         self._run_automation_script(script_name, full_address, "UPDATE", work_order_today_id, json_data)
-        #         print(f"Automation Success")
-        #         return Response(
-        #             {
-        #                 "status": "success",
-        #                 "message": "Work Order edit automation completed successfully.",
-        #                 "data": serializer.data
-        #             },
-        #             status=status.HTTP_200_OK
-        #         )
-        #     except subprocess.CalledProcessError as e:
-        #         # Automation failed; abort the database update and return error
-        #         print(f"Automation Failed: {e.stderr}")
-        #         return Response(
-        #             {
-        #                 "status": "failed",
-        #                 "message": f"Automation failed for status GET. Database was NOT updated.",
-        #                 "details": e.stderr
-        #             },
-        #             status=status.HTTP_400_BAD_REQUEST
-        #         )
+            try:
+                # Run the script before saving to the database
+                serializer = self.get_serializer(instance)
+                json_data = JSONRenderer().render(serializer.data)
+                self._run_automation_script(script_name, full_address, "UPDATE", work_order_today_id, json_data)
+                print(f"Automation Success")
+                return Response(
+                    {
+                        "status": "success",
+                        "message": "Work Order edit automation completed successfully.",
+                        "data": serializer.data
+                    },
+                    status=status.HTTP_200_OK
+                )
+            except subprocess.CalledProcessError as e:
+                # Automation failed; abort the database update and return error
+                print(f"Automation Failed: {e.stderr}")
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": f"Automation failed for status GET. Database was NOT updated.",
+                        "details": e.stderr
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         return response
 
 
