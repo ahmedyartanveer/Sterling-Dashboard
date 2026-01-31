@@ -3,6 +3,7 @@ import asyncio
 import os, json
 from automation.scrapers.online_rme_scraper import OnlineRMEScraper
 from tasks.helper.edit_task import OnlineRMEEditTaskHelper
+from asyncio import sleep
 
 # ==========================================
 # Force Unbuffered Output (Critical for Server Logs)
@@ -153,12 +154,24 @@ class OnlineRMELocedDeletedTask(OnlineRMEScraper, OnlineRMEEditTaskHelper):
                                         result = self.api_client.work_order_today_edit(get_form_data, int(work_order_edit_id))
                                         return True if result else False
                                 elif new_status == "UPDATE":
+                                    # form_data = dict(form_data)
+                                    log_info(f"Attempting to UPDATE...{type(form_data)}")
+                                    log_info(form_data)
                                     submit_form_data = await self.populate_form_data(form_data)
+                                    log_info(f"Attempting to click Edit Sava...{submit_form_data}")
                                     if submit_form_data:
-                                        
-                                        # click_item = get_item.locator('input')
-                                        log_info("Attempting to click Edit...")
-                                        # await click_item.click(timeout=5000) 
+                                        save_edit_form_btn = self.rules['save_edit_form_btn']
+                                        save_btn = self.page.locator(save_edit_form_btn)
+                                        try:
+                                            await save_btn.wait_for(state="visible", timeout=15000)
+                                            await save_btn.wait_for(state="attached", timeout=15000)
+                                        except:
+                                            pass
+                                        log_info("Attempting to click Edit Sava...")
+                                        await save_btn.click(timeout=5000) 
+                                        log_info("click")
+                                        await sleep(5)
+                                        await self.page.wait_for_load_state("networkidle", timeout=20000) 
                                         return True
                                     return False
                                 return False
@@ -224,7 +237,7 @@ async def main():
     log_info(f"Processing Work Order Address: {wo_address}")
     log_info(f"Processing Work Order Status: {new_status}")
     log_info(f"Processing Work Order ID: {work_order_edit_id}")
-    log_info(f"Processing Work Order Update Body: {form_data}")
+    log_info(f"Processing Work Order Update Body: {len(form_data)} {type(form_data)}")
 
     scraper = None
     exit_code = 1 

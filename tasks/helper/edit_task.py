@@ -103,9 +103,9 @@ class OnlineRMEEditTaskHelper:
         try:
             # Wait for table
             await self.page.wait_for_selector(
-                '#ctl00_DataGridQuestions', 
+                "//table[@id='GridViewPump'] | //table[@id='ctl00_DataGridQuestions']", 
                 state='attached', 
-                timeout=60000
+                timeout=6000
             )
 
             # Load JS content

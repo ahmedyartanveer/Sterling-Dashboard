@@ -101,6 +101,7 @@
         "xpath": "//input[@id='ctl02_DataGridOMhistory_ctl03_btnViewOMreport']"
       }
     ],
+    "save_edit_form_btn": "//input[@value='SAVE'] | //input[@id='btnSaveChanges2']",
     "work_history_table_xpath": "(//table[@id='ctl02_DataGridOMhistory']/tbody//tr)[position() > 1]",
     "wait_xpath": "//tbody[@class='fixed-body']",
     "wait_rme_body": "input[name='txtStreetNumber']",

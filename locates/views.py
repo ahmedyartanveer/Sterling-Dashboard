@@ -622,14 +622,15 @@ class WorkOrderTodayEditViewSet(viewsets.ModelViewSet):
             work_order_today = instance.work_order_today
             full_address = work_order_today.full_address
             work_order_today_id = work_order_today.id
+            form_data = instance.form_data
             script_name = 'run_locked_deleted_edit_task.py'
             print(f"Starting automation: {script_name} for ID: {instance.id}")
 
             try:
                 # Run the script before saving to the database
                 serializer = self.get_serializer(instance)
-                json_data = JSONRenderer().render(serializer.data)
-                self._run_automation_script(script_name, full_address, "UPDATE", work_order_today_id, json_data)
+                # json_data = JSONRenderer().render(serializer.data)
+                self._run_automation_script(script_name, full_address, "UPDATE", work_order_today_id, form_data)
                 print(f"Automation Success")
                 return Response(
                     {
