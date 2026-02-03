@@ -8,6 +8,7 @@ except:
     from base_scraper import BaseScraper
 from automation.utils.address_helpers import extract_address_details
 from tasks.helper.edit_task import OnlineRMEEditTaskHelper
+from datetime import datetime
 
 class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
     """
@@ -287,7 +288,9 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         
         for index, work_order in enumerate(work_orders, start=1):
             print(f"\n📄 Processing work order {index}/{total_count}...")
-            print(work_order)
+            if not work_order.get('tech_report_submitted'):
+                print("   Tech report already submitted. Skipping...")
+                continue
             
             try:
                 # Ensure authentication before each operation
@@ -380,6 +383,9 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                     print(f"Error performing action: {click_err}")
                     if address_status:
                         work_order['is_deleted'] = True
+                        work_order['deleted_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        work_order['deleted_by'] = "Automation"
+                        work_order['deleted_by_email'] = 'automation@sterling-septic.com'
                         self.api_client.manage_work_orders(
                             record_id=int(work_order_edit_id),
                             data=work_order,
