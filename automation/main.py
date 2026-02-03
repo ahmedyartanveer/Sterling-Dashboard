@@ -69,9 +69,7 @@ async def run_online_rme_scraper():
         # Fetch records that need URL updates
         work_orders_missing_urls = scraper.api_client.manage_work_orders(
             method_type="GET",
-            params={
-                "last_report_link__isnull": "isnull"
-            }
+            params='is_deleted=false'
         )
         
         record_count = len(work_orders_missing_urls) if work_orders_missing_urls else 0
@@ -79,17 +77,9 @@ async def run_online_rme_scraper():
         
         if work_orders_missing_urls:
             updated_records = await scraper.run(work_orders_missing_urls)
-            
-            # Update each record via API
-            for record in updated_records:
-                record_id = record.get('id')
-                if record_id:
-                    scraper.api_client.manage_work_orders(
-                        method_type="PATCH",
-                        data=record,
-                        record_id=record_id
-                    )
-            
+            del scraper
+            scraper = OnlineRMEScraper()
+            await scraper.workorder_address_check_and_get_form(updated_records)
             print("RME data patching completed.")
         else:
             print("No RME records found to update.")
@@ -106,8 +96,8 @@ async def run_online_rme_scraper():
 
 async def main():
     """Main execution flow - runs all scrapers in sequence."""
-    await run_fieldedge_scraper()
-    await run_work_orders_scraper()
+    # await run_fieldedge_scraper()
+    # await run_work_orders_scraper()
     await run_online_rme_scraper()
 
 

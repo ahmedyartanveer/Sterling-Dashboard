@@ -142,24 +142,20 @@ class OnlineRMELocedDeletedTask(OnlineRMEScraper, OnlineRMEEditTaskHelper):
                                 await self.page.wait_for_timeout(2000) 
                                 log_success(f"DELETED successfully.")
                                 return True
-                            elif new_status == "GET" or new_status == "UPDATE":
+                            elif new_status == "UPDATE":
                                 get_item = columns.nth(10) 
                                 click_item = get_item.locator('input')
                                 log_info("Attempting to click Edit...")
                                 await click_item.click(timeout=5000)
                                 await self.page.wait_for_load_state("networkidle", timeout=20000) 
-                                if new_status == "GET":
-                                    get_form_data = await self.scrape_edit_form_data()
-                                    if len(get_form_data) != 0:
-                                        result = self.api_client.work_order_today_edit(get_form_data, int(work_order_edit_id))
-                                        return True if result else False
-                                elif new_status == "UPDATE":
-                                    # form_data = dict(form_data)
-                                    log_info(f"Attempting to UPDATE...{type(form_data)}")
-                                    log_info(form_data)
-                                    submit_form_data = await self.populate_form_data(form_data)
-                                    log_info(f"Attempting to click Edit Sava...{submit_form_data}")
-                                    if submit_form_data:
+                                # form_data = dict(form_data)
+                                log_info(f"Attempting to UPDATE...{type(form_data)}")
+                                submit_form_data = await self.populate_form_data(form_data)
+                                log_info(f"Attempting to click Edit Sava...{submit_form_data}")
+                                result = False
+                                if submit_form_data:
+                                    try:
+                                        await self.page.wait_for_load_state("networkidle", timeout=20000) 
                                         save_edit_form_btn = self.rules['save_edit_form_btn']
                                         save_btn = self.page.locator(save_edit_form_btn)
                                         try:
@@ -168,13 +164,14 @@ class OnlineRMELocedDeletedTask(OnlineRMEScraper, OnlineRMEEditTaskHelper):
                                         except:
                                             pass
                                         log_info("Attempting to click Edit Sava...")
-                                        await save_btn.click(timeout=5000) 
+                                        async with self.page.expect_navigation(wait_until="networkidle"):
+                                            await save_btn.click()
+                                        result = True
                                         log_info("click")
-                                        await sleep(5)
                                         await self.page.wait_for_load_state("networkidle", timeout=20000) 
-                                        return True
-                                    return False
-                                return False
+                                    except:
+                                        pass
+                                return result 
                             else:
                                 log_error(f"Invalid status provided: {new_status}")
                                 return False

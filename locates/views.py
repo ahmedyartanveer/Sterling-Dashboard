@@ -561,96 +561,73 @@ class WorkOrderTodayEditViewSet(viewsets.ModelViewSet):
             env=env
         )
 
-    # --- 1. Custom GET Method (Single Data) ---
-    def retrieve(self, request, *args, **kwargs):
-        try:
-            work_order_today_id = kwargs.get('work_order_today_id', None)
-            if work_order_today_id:
-                try:
-                    work_order_today = WorkOrderToday.objects.get(id=work_order_today_id)
-                    if work_order_today and not WorkOrderTodayEdit.objects.filter(work_order_today=work_order_today).exists():
-                        WorkOrderTodayEdit.objects.create(
-                            form_data={},
-                            work_order_today=work_order_today
-                        )
-                except Exception as e:
-                    return Response({"status": "failed", "message": "Work Order Today No data found."}, status=status.HTTP_404_NOT_FOUND)
-                full_address = work_order_today.full_address
-                
-                script_name = 'run_locked_deleted_edit_task.py'
-                print(f"Starting automation: {script_name} for ID: {work_order_today.id}")
-
-                try:
-                    # Run the script before saving to the database
-                    self._run_automation_script(script_name, full_address, "GET", work_order_today_id, None)
-                    print(f"Automation Success")
-                    update_work_order_today_edit = WorkOrderTodayEdit.objects.get(work_order_today=work_order_today)
-                    serializer = self.get_serializer(update_work_order_today_edit)
-                    return Response(
-                        {
-                            "status": "success",
-                            "message": "Work Order edit automation completed successfully.",
-                            "data": serializer.data
-                        },
-                        status=status.HTTP_200_OK
-                    )
-                except subprocess.CalledProcessError as e:
-                    # Automation failed; abort the database update and return error
-                    print(f"Automation Failed: {e.stderr}")
-                    return Response(
-                        {
-                            "status": "failed",
-                            "message": f"Automation failed for status GET. Database was NOT updated.",
-                            "details": e.stderr
-                        },
-                        status=status.HTTP_400_BAD_REQUEST
-                    )  
-            else:
-                return Response({"status": "failed", "message": "No data found."}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            print(e)
-            return Response({"status": "failed", "message": "Something went wrong, try again later"}, status=status.HTTP_404_NOT_FOUND)
-
-    # --- 2. Custom PATCH Method (Update specific fields) ---
+        # --- 2. Custom PATCH Method (Update specific fields) ---
     def partial_update(self, request, *args, **kwargs):
         status_query = request.query_params.get('status')
 
-        response = super().partial_update(request, *args, **kwargs)
-        instance = self.get_object()   # 🔥 actual model instance
-
-        if not status_query:
-            work_order_today = instance.work_order_today
-            full_address = work_order_today.full_address
-            work_order_today_id = work_order_today.id
-            form_data = instance.form_data
-            script_name = 'run_locked_deleted_edit_task.py'
-            print(f"Starting automation: {script_name} for ID: {instance.id}")
-
+        if status_query:
+            work_order_today_id = kwargs.get('work_order_today_id')
             try:
-                # Run the script before saving to the database
-                serializer = self.get_serializer(instance)
-                # json_data = JSONRenderer().render(serializer.data)
-                self._run_automation_script(script_name, full_address, "UPDATE", work_order_today_id, form_data)
-                print(f"Automation Success")
-                return Response(
-                    {
-                        "status": "success",
-                        "message": "Work Order edit automation completed successfully.",
-                        "data": serializer.data
-                    },
-                    status=status.HTTP_200_OK
-                )
-            except subprocess.CalledProcessError as e:
-                # Automation failed; abort the database update and return error
-                print(f"Automation Failed: {e.stderr}")
+                work_order_today_instance = WorkOrderToday.objects.get(pk=work_order_today_id)
+            except WorkOrderToday.DoesNotExist:
                 return Response(
                     {
                         "status": "failed",
-                        "message": f"Automation failed for status GET. Database was NOT updated.",
-                        "details": e.stderr
+                        "message": f"WorkOrderToday with id {work_order_today_id} does not exist."
                     },
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_404_NOT_FOUND
                 )
-        return response
+
+            print("request.data", request.data)
+            form_data = request.data.get('form_data', [])
+            
+            # use update_or_create — sets `created` correctly and gives back the instance
+            instance, created = WorkOrderTodayEdit.objects.update_or_create(
+                work_order_today=work_order_today_instance,
+                defaults={'form_data': form_data}
+            )
+
+            serializer = self.get_serializer(instance)
+            return Response(
+                {
+                    "status": "success",
+                    "message": "WorkOrderTodayEdit created." if created else "WorkOrderTodayEdit updated.",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            )
+
+        # ✅ status_query 
+        response = super().partial_update(request, *args, **kwargs)
+        instance = self.get_object()
+
+        work_order_today = instance.work_order_today
+        full_address = work_order_today.full_address
+        work_order_today_id = work_order_today.id
+        form_data = instance.form_data
+        script_name = 'run_locked_deleted_edit_task.py'
+        print(f"Starting automation: {script_name} for ID: {instance.id}")
+        serializer = self.get_serializer(instance)
+        try:
+            self._run_automation_script(script_name, full_address, "UPDATE", work_order_today_id, form_data)
+            print("Automation Success")
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Work Order edit automation completed successfully.",
+                    "data": serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Automation Failed: {e.stderr}")
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Automation failed. Database was NOT updated.",
+                    "details": e.stderr
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
