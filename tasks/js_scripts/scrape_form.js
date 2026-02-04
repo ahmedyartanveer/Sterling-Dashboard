@@ -139,7 +139,7 @@
                             "name": questionText,
                         };
 
-                        // Check for select element
+                        // Check for select element in second cell
                         const selectElement = secondCell.querySelector('select');
                         const inputElement = secondCell.querySelector('input[type="text"]');
 
@@ -161,6 +161,45 @@
                         } else if (inputElement) {
                             item.type = "text";
                             item.value = inputElement.value.trim();
+                        }
+
+                        // NEW: Check if there's a third cell (last td) with additional fields
+                        if (cells.length >= 3 && item.type) {
+                            const lastCell = cells[cells.length - 1];
+                            const lastCellSelect = lastCell.querySelector('select');
+                            const lastCellInput = lastCell.querySelector('input[type="text"]');
+                            
+                            // Check if field exists and is NOT disabled
+                            if (lastCellSelect && !lastCellSelect.disabled) {
+                                item.fields = [];
+                                
+                                const fieldItem = {
+                                    "type": "select",
+                                    "options": [],
+                                    "selected": ""
+                                };
+                                
+                                // Collect all options
+                                for (let k = 0; k < lastCellSelect.options.length; k++) {
+                                    fieldItem.options.push(lastCellSelect.options[k].text);
+                                }
+                                
+                                // Get selected value
+                                if (lastCellSelect.selectedIndex >= 0) {
+                                    fieldItem.selected = lastCellSelect.options[lastCellSelect.selectedIndex].text;
+                                }
+                                
+                                item.fields.push(fieldItem);
+                            } else if (lastCellInput && !lastCellInput.disabled) {
+                                item.fields = [];
+                                
+                                const fieldItem = {
+                                    "type": "text",
+                                    "value": lastCellInput.value.trim()
+                                };
+                                
+                                item.fields.push(fieldItem);
+                            }
                         }
 
                         // Only add if we found an input type
