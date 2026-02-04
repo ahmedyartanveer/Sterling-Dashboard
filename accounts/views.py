@@ -132,7 +132,7 @@ class AuthView(viewsets.GenericViewSet):
 
 
 # ==========================================
-# USER CONTROLLER (Admin)
+# USER CONTROLLER (Admin) - FIXED VERSION
 # ==========================================
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -187,9 +187,7 @@ class UserViewSet(viewsets.ModelViewSet):
     # --- 2. Create User ---
     @swagger_auto_schema(request_body=CreateUserSerializer)
     def create(self, request, *args, **kwargs):
-        if request.data.get('role') == 'superadmin' and request.user.role != 'superadmin':
-            return Response({'success': False, 'message': 'Only superadmin can create superadmin users'}, status=status.HTTP_403_FORBIDDEN)
-        
+        # Superadmin can create any role including other superadmins
         serializer = CreateUserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
@@ -201,12 +199,7 @@ class UserViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
         
-        # Permission Logic
-        if instance.role == 'superadmin' and request.user.role != 'superadmin':
-             return Response({'success': False, 'message': 'Only superadmin can modify superadmin users'}, status=status.HTTP_403_FORBIDDEN)
-        if request.data.get('role') == 'superadmin' and request.user.role != 'superadmin':
-             return Response({'success': False, 'message': 'Only superadmin can assign superadmin role'}, status=status.HTTP_403_FORBIDDEN)
-
+        # Superadmin can update any user including other superadmins
         serializer = UpdateUserSerializer(instance, data=request.data, partial=True)
         if serializer.is_valid():
             user = serializer.save()
@@ -216,11 +209,12 @@ class UserViewSet(viewsets.ModelViewSet):
     # --- 4. Delete User ---
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if instance.role == 'superadmin':
-            return Response({'success': False, 'message': 'Cannot delete superadmin user'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Prevent self-deletion
         if instance.id == request.user.id:
             return Response({'success': False, 'message': 'Cannot delete your own account'}, status=status.HTTP_403_FORBIDDEN)
         
+        # Superadmin can delete any user (including other superadmins)
         self.perform_destroy(instance)
         return Response({'success': True, 'message': 'User deleted successfully'})
 
@@ -232,10 +226,9 @@ class UserViewSet(viewsets.ModelViewSet):
         except User.DoesNotExist:
             return Response({'success': False, 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        if user.role == 'superadmin':
-            return Response({'success': False, 'message': 'Cannot deactivate superadmin user'}, status=status.HTTP_403_FORBIDDEN)
+        # Prevent self-deactivation/activation
         if user.id == request.user.id:
-             return Response({'success': False, 'message': 'Cannot deactivate your own account'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'success': False, 'message': 'Cannot modify status of your own account'}, status=status.HTTP_403_FORBIDDEN)
 
         user.is_active = not user.is_active
         user.save()
@@ -253,9 +246,9 @@ class UserViewSet(viewsets.ModelViewSet):
         is_active = serializer.validated_data['isActive']
         
         users = User.objects.filter(id__in=user_ids)
-        if users.filter(role='superadmin').exists():
-            return Response({'success': False, 'message': 'Cannot modify superadmin users'}, status=status.HTTP_403_FORBIDDEN)
-        if users.filter(id=request.user.id).exists() and is_active is False:
+        
+        # Prevent self-deactivation
+        if request.user.id in user_ids and is_active is False:
              return Response({'success': False, 'message': 'Cannot deactivate your own account'}, status=status.HTTP_403_FORBIDDEN)
 
         updated_count = users.update(is_active=is_active)
@@ -270,11 +263,10 @@ class UserViewSet(viewsets.ModelViewSet):
 # Tech Users View
 class TechUserView(generics.ListAPIView):
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated] # Note: Node logic didn't have admin check for this
+    permission_classes = [IsAuthenticated]
     pagination_class = CustomPagination
 
     def get_queryset(self):
-        # Same filtering logic as UserViewSet logic can be applied here
         queryset = User.objects.filter(role='tech')
         return queryset
     
