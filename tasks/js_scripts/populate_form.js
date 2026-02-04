@@ -51,9 +51,6 @@
     if (isFormType1) {
         const table = document.getElementById('ctl00_DataGridQuestions');
         const rows = table ? table.getElementsByTagName('tr') : [];
-        
-        // Track which rows have been used to avoid duplicate matches
-        const usedRowIndices = new Set();
 
         data.forEach(item => {
             let foundInTable = false;
@@ -61,19 +58,11 @@
             // 1. Update Main Data Grid (Questions table)
             if (table) {
                 for (let i = 0; i < rows.length; i++) {
-                    // Skip if this row was already used
-                    if (usedRowIndices.has(i)) {
-                        continue;
-                    }
-                    
                     const row = rows[i];
                     const questionSpan = row.querySelector('span[id$="_txtQuestion"]');
 
                     if (questionSpan && questionSpan.innerText.trim() === item.name) {
                         foundInTable = true;
-                        
-                        // Mark this row as used
-                        usedRowIndices.add(i);
 
                         if (item.type === 'select') {
                             const selectBox = row.querySelector('select');
@@ -82,7 +71,6 @@
                             const inputBox = row.querySelector('input[type="text"]');
                             setInputValue(inputBox, item.value);
                         }
-                        
                         break;
                     }
                 }
@@ -113,9 +101,6 @@
     if (isFormType2) {
         const table = document.getElementById('GridViewPump');
         const rows = table ? table.getElementsByTagName('tr') : [];
-        
-        // Track which rows have been used to avoid duplicate matches
-        const usedRowIndices = new Set();
 
         data.forEach(item => {
             let foundInTable = false;
@@ -123,11 +108,6 @@
             // 1. Update Main Data Grid (GridViewPump table)
             if (table) {
                 for (let i = 0; i < rows.length; i++) {
-                    // Skip if this row was already used
-                    if (usedRowIndices.has(i)) {
-                        continue;
-                    }
-                    
                     const row = rows[i];
                     const cells = row.getElementsByTagName('td');
                     
@@ -137,13 +117,8 @@
 
                         if (questionText === item.name) {
                             foundInTable = true;
-                            
-                            // Mark this row as used
-                            usedRowIndices.add(i);
-                            
                             const secondCell = cells[1];
 
-                            // Set value in second cell
                             if (item.type === 'select') {
                                 const selectBox = secondCell.querySelector('select');
                                 setSelectByText(selectBox, item.selected);
@@ -151,26 +126,6 @@
                                 const inputBox = secondCell.querySelector('input[type="text"]');
                                 setInputValue(inputBox, item.value);
                             }
-
-                            // Handle fields array (third cell / last td)
-                            if (item.fields && item.fields.length > 0 && cells.length >= 3) {
-                                const lastCell = cells[cells.length - 1];
-                                
-                                item.fields.forEach(field => {
-                                    if (field.type === 'select') {
-                                        const lastCellSelect = lastCell.querySelector('select:not([disabled])');
-                                        if (lastCellSelect) {
-                                            setSelectByText(lastCellSelect, field.selected);
-                                        }
-                                    } else if (field.type === 'text') {
-                                        const lastCellInput = lastCell.querySelector('input[type="text"]:not([disabled])');
-                                        if (lastCellInput) {
-                                            setInputValue(lastCellInput, field.value);
-                                        }
-                                    }
-                                });
-                            }
-
                             break;
                         }
                     }

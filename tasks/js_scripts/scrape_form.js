@@ -29,6 +29,7 @@
                         "name": questionSpan.innerText.trim(),
                     };
 
+                    const cells = row.getElementsByTagName('td');
                     const selectElement = row.querySelector('select');
                     const inputElement = row.querySelector('input[type="text"]');
 
@@ -52,6 +53,34 @@
                         item.value = inputElement.value.trim();
                     }
 
+                    // Extract status from third column (last td)
+                    if (cells.length >= 3) {
+                        const statusCell = cells[2];
+                        const statusSelect = statusCell.querySelector('select');
+                        const statusInput = statusCell.querySelector('input[type="text"]');
+                        const statusSpan = statusCell.querySelector('span');
+                        
+                        if (statusSelect && !statusSelect.disabled) {
+                            // If select exists and not disabled, get selected value
+                            if (statusSelect.selectedIndex >= 0) {
+                                item.status = statusSelect.options[statusSelect.selectedIndex].text;
+                            } else {
+                                item.status = "";
+                            }
+                        } else if (statusInput && !statusInput.disabled) {
+                            // If text input exists and not disabled, get value
+                            item.status = statusInput.value.trim();
+                        } else if (statusSpan) {
+                            // If span exists, get its text content
+                            item.status = statusSpan.innerText.trim();
+                        } else {
+                            // If disabled or empty, set to empty string
+                            item.status = "";
+                        }
+                    } else {
+                        item.status = "";
+                    }
+
                     resultData.push(item);
                 }
             }
@@ -67,7 +96,8 @@
             resultData.push({
                 "type": "textarea",
                 "name": labelText,
-                "value": commentsBox.value 
+                "value": commentsBox.value,
+                "status": ""
             });
         }
 
@@ -82,7 +112,8 @@
                 "type": "select",
                 "name": fullLabel.trim(),
                 "options": [],
-                "selected": ""
+                "selected": "",
+                "status": ""
             };
 
             for (let k = 0; k < correctionSelect.options.length; k++) {
@@ -103,7 +134,8 @@
                 "type": "select",
                 "name": fwLabel ? fwLabel.innerText.trim() : "Fieldwork performed by:",
                 "options": [],
-                "selected": ""
+                "selected": "",
+                "status": ""
             };
 
             for (let m = 0; m < fieldworkSelect.options.length; m++) {
@@ -139,7 +171,7 @@
                             "name": questionText,
                         };
 
-                        // Check for select element in second cell
+                        // Check for select element
                         const selectElement = secondCell.querySelector('select');
                         const inputElement = secondCell.querySelector('input[type="text"]');
 
@@ -163,43 +195,32 @@
                             item.value = inputElement.value.trim();
                         }
 
-                        // NEW: Check if there's a third cell (last td) with additional fields
-                        if (cells.length >= 3 && item.type) {
-                            const lastCell = cells[cells.length - 1];
-                            const lastCellSelect = lastCell.querySelector('select');
-                            const lastCellInput = lastCell.querySelector('input[type="text"]');
+                        // Extract status from third column (last td)
+                        if (cells.length >= 3) {
+                            const statusCell = cells[2];
+                            const statusSelect = statusCell.querySelector('select');
+                            const statusInput = statusCell.querySelector('input[type="text"]');
+                            const statusSpan = statusCell.querySelector('span');
                             
-                            // Check if field exists and is NOT disabled
-                            if (lastCellSelect && !lastCellSelect.disabled) {
-                                item.fields = [];
-                                
-                                const fieldItem = {
-                                    "type": "select",
-                                    "options": [],
-                                    "selected": ""
-                                };
-                                
-                                // Collect all options
-                                for (let k = 0; k < lastCellSelect.options.length; k++) {
-                                    fieldItem.options.push(lastCellSelect.options[k].text);
+                            if (statusSelect && !statusSelect.disabled) {
+                                // If select exists and not disabled, get selected value
+                                if (statusSelect.selectedIndex >= 0) {
+                                    item.status = statusSelect.options[statusSelect.selectedIndex].text;
+                                } else {
+                                    item.status = "";
                                 }
-                                
-                                // Get selected value
-                                if (lastCellSelect.selectedIndex >= 0) {
-                                    fieldItem.selected = lastCellSelect.options[lastCellSelect.selectedIndex].text;
-                                }
-                                
-                                item.fields.push(fieldItem);
-                            } else if (lastCellInput && !lastCellInput.disabled) {
-                                item.fields = [];
-                                
-                                const fieldItem = {
-                                    "type": "text",
-                                    "value": lastCellInput.value.trim()
-                                };
-                                
-                                item.fields.push(fieldItem);
+                            } else if (statusInput && !statusInput.disabled) {
+                                // If text input exists and not disabled, get value
+                                item.status = statusInput.value.trim();
+                            } else if (statusSpan) {
+                                // If span exists, get its text content
+                                item.status = statusSpan.innerText.trim();
+                            } else {
+                                // If disabled or empty, set to empty string
+                                item.status = "";
                             }
+                        } else {
+                            item.status = "";
                         }
 
                         // Only add if we found an input type
@@ -218,7 +239,8 @@
             resultData.push({
                 "type": "textarea",
                 "name": "OVERALL COMMENTS: Provide additional or clarifying information regarding any observed deficiencies or status of the system",
-                "value": commentsBox2.value 
+                "value": commentsBox2.value,
+                "status": ""
             });
         }
 
@@ -231,7 +253,8 @@
                 "type": "select",
                 "name": lblCorrection ? lblCorrection.innerText.trim() : "Correction status:",
                 "options": [],
-                "selected": ""
+                "selected": "",
+                "status": ""
             };
 
             for (let k = 0; k < correctionSelect2.options.length; k++) {
@@ -251,7 +274,8 @@
             resultData.push({
                 "type": "text",
                 "name": lblFieldwork ? lblFieldwork.innerText.trim() : "Fieldwork performed by:",
-                "value": fieldworkInput.value.trim()
+                "value": fieldworkInput.value.trim(),
+                "status": ""
             });
         }
 
@@ -264,7 +288,8 @@
                 "type": "select",
                 "name": (lblDumpLocation ? lblDumpLocation.innerText.trim() : "Proposed dump location:") + " (State)",
                 "options": [],
-                "selected": ""
+                "selected": "",
+                "status": ""
             };
 
             for (let k = 0; k < stateSelect.options.length; k++) {
@@ -283,7 +308,8 @@
                 "type": "select",
                 "name": "Dump Location Detail",
                 "options": [],
-                "selected": ""
+                "selected": "",
+                "status": ""
             };
 
             for (let k = 0; k < dumpLocationSelect.options.length; k++) {
