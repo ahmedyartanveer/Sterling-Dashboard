@@ -243,34 +243,33 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 
                 street_number, street_name = extract_address_details(full_address)
                 if not street_number or not street_name:
+                    print(f"⏭️  Skipping item {index}: Could not parse address.")
                     continue
                 
                 # Search for property
                 await self.search_property(street_number, street_name)
                 
-                # Fetch last report link if not already present
-                if not work_order.get('last_report_link'):
-                    last_report_link = await self.fetch_last_report_link()
-                    if last_report_link:
-                        work_orders[index - 1]['last_report_link'] = last_report_link
+                # Always fetch last report link regardless of tech_report_submitted status
+                last_report_link = await self.fetch_last_report_link()
+                if last_report_link:
+                    work_orders[index - 1]['last_report_link'] = last_report_link
+                    print(f"✅ Last report link updated: {last_report_link}")
                 
-                # Fetch unlocked report link if not already present
-                if not work_order.get("tech_report_submitted"):
-                    full_address = work_order.get("full_address")
-                    if full_address:
-                        tech_report_submitted = await self.address_match_in_work_history(full_address)
-                        if tech_report_submitted is not None:
-                            work_orders[index - 1]['tech_report_submitted'] = tech_report_submitted
-                        else:
-                            work_orders[index - 1]['tech_report_submitted'] = False
-                    else:
-                        work_orders[index - 1]['tech_report_submitted'] = False
-                        print(f"⏭️  Skipping item {index}: No address provided.")
-                print(f"   Last: {work_order.get('last_report_link')}")
-                print(f"   tech_report_submitted: {work_order.get('tech_report_submitted')}")
+                # Check if address exists in work history (tech report submitted)
+                tech_report_submitted = await self.address_match_in_work_history(full_address)
+                work_orders[index - 1]['tech_report_submitted'] = tech_report_submitted
+                
+                print(f"✅ Processing completed for: {full_address}")
+                print(f"   Last report link: {last_report_link}")
+                print(f"   Tech report submitted: {tech_report_submitted}")
             
             except Exception as e:
                 print(f"❌ Unexpected error processing item {index} ({full_address}): {e}")
+                # Set default values on error
+                if 'last_report_link' not in work_orders[index - 1]:
+                    work_orders[index - 1]['last_report_link'] = None
+                if 'tech_report_submitted' not in work_orders[index - 1]:
+                    work_orders[index - 1]['tech_report_submitted'] = False
         
         # Cleanup
         await self.cleanup()
@@ -393,13 +392,13 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
     
     async def workorder_address_check_and_get_form(self, work_orders):
         """
-        Process multiple work orders to fetch report links.
+        Process multiple work orders to fetch report links and form data.
         
         Args:
             work_orders: List of work order dictionaries with addresses
             
         Returns:
-            list: Updated work orders with report links
+            list: Updated work orders with report links and form data
         """
         if not self.page:
             await self.initialize()
@@ -432,12 +431,30 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                     print(f"⏭️  Skipping item {index}: No address provided.")
                     continue
                 
+                # FIRST: Always fetch last report link
+                print(f"Fetching last report link for: {full_address}")
+                street_number, street_name = extract_address_details(full_address)
+                if not street_number or not street_name:
+                    print(f"⏭️  Skipping item {index}: Could not parse address.")
+                    continue
+                
+                # Search for property
+                await self.search_property(street_number, street_name)
+                
+                # Fetch last report link
+                last_report_link = await self.fetch_last_report_link()
+                if last_report_link:
+                    work_orders[index - 1]['last_report_link'] = last_report_link
+                    print(f"✅ Last report link updated: {last_report_link}")
+                
+                # SECOND: Check work history for address match
+                print(f"Checking work history for address: {full_address}")
                 rme_work_history_url = self.rules.get('rme_work_history_url')
                 table_selector = self.rules.get("wait_work_history_table")
                 rows_selector = self.rules.get("work_history_table_xpath")
                 
                 try:
-                    # Navigate to page
+                    # Navigate to work history page
                     await self.page.goto(url=rme_work_history_url, wait_until='domcontentloaded')
                     
                     # Wait for table visibility
@@ -452,17 +469,20 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                     if not rows:
                         print("Table found but it has no rows.")
                         continue
+                    
                     print(f"Table loaded. Checking {len(rows)} rows for address match...")
+                    
                     # Normalize search string
                     full_address_lower = full_address.strip().lower()
-                    address_status = True
-                    for index, row in enumerate(rows):
+                    address_found = False
+                    
+                    for row_index, row in enumerate(rows):
                         columns = row.locator("td")
                         column_count = await columns.count()
                         
                         # Ensure enough columns exist (need at least 12)
                         if column_count > 11:
-                            address_cell = columns.nth(7) # 8th column
+                            address_cell = columns.nth(7)  # 8th column
                             address_text = await address_cell.inner_text()
                             
                             if not address_text:
@@ -475,77 +495,118 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                             
                             # Compare
                             if clean_addr_text.lower() in full_address_lower:
-                                print(f"Match found at row {index + 1}: {clean_addr_text}")
-                                address_status = False
+                                print(f"✅ Address match found at row {row_index + 1}: {clean_addr_text}")
+                                address_found = True
+                                work_orders[index - 1]['tech_report_submitted'] = True
+                                
                                 try:
-                                    get_item = columns.nth(10) 
-                                    click_item = get_item.locator('input')
-                                    print("Attempting to click Edit...")
-                                    await click_item.click(timeout=5000)
-                                    await self.page.wait_for_load_state("networkidle", timeout=20000) 
+                                    # Click Edit button (11th column)
+                                    edit_cell = columns.nth(10)
+                                    edit_button = edit_cell.locator('input')
+                                    print("Clicking Edit button...")
+                                    await edit_button.click(timeout=5000)
+                                    await self.page.wait_for_load_state("networkidle", timeout=20000)
+                                    
+                                    # Scrape form data
+                                    print("Scraping form data...")
                                     get_form_data = await self.scrape_edit_form_data()
+                                    
+                                    # Open and scrape septic components
+                                    print("Opening septic components...")
                                     await self.open_septic_components()
                                     septic_components_form_data = await self.scrape_components_table()
+                                    
+                                    # Update database with scraped data
                                     if len(get_form_data) == 0:
                                         get_form_data = []
                                     if len(septic_components_form_data) == 0:
                                         septic_components_form_data = []
-                                    self.api_client.work_order_today_edit(get_form_data, septic_components_form_data, int(work_order_edit_id))
-                                    break
-                                except Exception as click_err:
-                                    print(f"Error performing action: {click_err}")
-                                    break
-                    if address_status:
-                        if work_order.get('tech_report_submitted') == True:
-                            print("tech_report_submitted: True")
-                            if await self.select_locked_reports():
-                                result = await self.check_locked_reports(full_address=full_address)
-                                if result:
-                                     await self.save_report_chaek_result(
-                                        result=result,
-                                        work_order_edit_id=work_order_edit_id
+                                    
+                                    self.api_client.work_order_today_edit(
+                                        get_form_data, 
+                                        septic_components_form_data, 
+                                        int(work_order_edit_id)
                                     )
-                                else:
-                                    if await self.open_discarded_reports():
-                                        result = await self.check_discarded_reports(full_address=full_address)
-                                        if result:
-                                            await self.save_report_chaek_result(
-                                                result=result,
-                                                work_order_edit_id=work_order_edit_id
-                                            )
-                                        else:
-                                            print(f"Faild Result: check_discarded_reports")
+                                    
+                                    print("✅ Form data scraped and saved successfully.")
+                                    break
+                                    
+                                except Exception as click_err:
+                                    print(f"❌ Error performing action: {click_err}")
+                                    break
+                    
+                    if not address_found:
+                        print(f"❌ Address not found in work history: {full_address}")
+                        work_orders[index - 1]['tech_report_submitted'] = False
+                        
+                        # Check locked reports if address not found in work history
+                        print("Checking locked reports...")
+                        if await self.select_locked_reports():
+                            result = await self.check_locked_reports(full_address=full_address)
+                            if result:
+                                await self.save_report_check_result(
+                                    result=result,
+                                    work_order_edit_id=work_order_edit_id
+                                )
+                                print("✅ Address found in locked reports.")
                             else:
+                                # Check discarded reports if not in locked reports
+                                print("Checking discarded reports...")
                                 if await self.open_discarded_reports():
-                                    result = await self.check_discarded_reports()
+                                    result = await self.check_discarded_reports(full_address=full_address)
                                     if result:
-                                        await self.save_report_chaek_result(
+                                        await self.save_report_check_result(
                                             result=result,
                                             work_order_edit_id=work_order_edit_id
                                         )
+                                        print("✅ Address found in discarded reports.")
                                     else:
-                                        print(f"Faild Result: check_discarded_reports")
+                                        print("❌ Address not found in locked or discarded reports.")
+                                        # Update status to indicate not found
+                                        result = {
+                                            "status": "NOT_FOUND",
+                                            "finalized_by": "Automation",
+                                            "finalized_by_email": "automation@sterling-septic.com",
+                                            "finalized_date": timezone.now()
+                                        }
+                                        await self.save_report_check_result(
+                                            result=result,
+                                            work_order_edit_id=work_order_edit_id
+                                        )
+                                else:
+                                    print("❌ Failed to open discarded reports.")
                         else:
-                            print("Address match found in work history. Skipping tech report submission.")
+                            print("❌ Failed to select locked reports.")
+                
                 except Exception as e:
-                    print("workorder_address_check")
+                    print(f"❌ Error checking work history: {e}")
+                
+                print(f"✅ Processing completed for work order {index}")
+                print(f"   Last report link: {work_orders[index - 1].get('last_report_link')}")
+                print(f"   Tech report submitted: {work_orders[index - 1].get('tech_report_submitted')}")
+                
             except Exception as e:
                 print(f"❌ Unexpected error processing item {index} ({full_address}): {e}")
+                # Set default values on error
+                if 'last_report_link' not in work_orders[index - 1]:
+                    work_orders[index - 1]['last_report_link'] = None
+                if 'tech_report_submitted' not in work_orders[index - 1]:
+                    work_orders[index - 1]['tech_report_submitted'] = False
         
         # Cleanup
         await self.cleanup()
         
         return work_orders
     
-    async def save_report_chaek_result(self, result, work_order_edit_id):
+    async def save_report_check_result(self, result, work_order_edit_id):
         print(f"Final Result: {result}")
         try:
             await sync_to_async(self._save_report_check_result_sync)(
                 result, work_order_edit_id
             )
-            print("Save database")
+            print("✅ Database updated successfully.")
         except Exception as e:
-            print(f"Save database Failed: {e}")
+            print(f"❌ Failed to update database: {e}")
 
             
     def _save_report_check_result_sync(self, result, work_order_edit_id):
