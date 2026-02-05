@@ -43,6 +43,40 @@ class OnlineRMELocedDeletedTask(OnlineRMEScraper, OnlineRMEEditTaskHelper):
         # self.scrape_edit_form_data()
         # self.populate_form_data()
     
+    # ---------------- ADD COMPONENT ----------------
+    async def add_component(self, form_data) -> bool:
+        try:
+            await self.page.select_option("#ctl02_drpComponent", label=form_data["category"])
+
+            await self.page.wait_for_function(
+                "document.getElementById('ctl02_drpComponentType').disabled === false"
+            )
+
+            await self.page.select_option("#ctl02_drpComponentType", label=form_data["componentType"])
+            await self.page.wait_for_timeout(800)
+
+            await self.page.select_option("#ctl02_drpManufacturer", label=form_data["manufacturer"])
+            await self.page.wait_for_timeout(800)
+
+            await self.page.wait_for_function(f"""
+                [...document.querySelectorAll('#ctl02_drpModel option')]
+                    .some(o => o.textContent.trim() === '{form_data["model"]}')
+            """)
+
+            await self.page.select_option("#ctl02_drpModel", label=form_data["model"])
+            await self.page.fill("#ctl02_txtUserLabel", form_data["customLabel"])
+
+            async with self.page.expect_navigation():
+                await self.page.click("#ctl02_btnAddComponent")
+
+            await self.page.wait_for_load_state("networkidle")
+            await self.page.wait_for_timeout(2000)  # allow table refresh
+            return True
+        except Exception as e:
+            log_error(f"{e}")
+            return False
+
+    
     async def address_match_and_lock_task(self, full_address: str, new_status:str, work_order_edit_id:str, form_data:dict) -> bool:
         """Checks if the address exists in the work history table and locks it if found."""
         log_info(f"Starting address match process for: {full_address}")
@@ -142,35 +176,39 @@ class OnlineRMELocedDeletedTask(OnlineRMEScraper, OnlineRMEEditTaskHelper):
                                 await self.page.wait_for_timeout(2000) 
                                 log_success(f"DELETED successfully.")
                                 return True
-                            elif new_status == "UPDATE":
+                            elif new_status == "UPDATE" or new_status == "PREVIEW":
                                 get_item = columns.nth(10) 
                                 click_item = get_item.locator('input')
                                 log_info("Attempting to click Edit...")
                                 await click_item.click(timeout=5000)
                                 await self.page.wait_for_load_state("networkidle", timeout=20000) 
                                 # form_data = dict(form_data)
-                                log_info(f"Attempting to UPDATE...{type(form_data)}")
-                                submit_form_data = await self.populate_form_data(form_data)
-                                log_info(f"Attempting to click Edit Sava...{submit_form_data}")
-                                result = False
-                                if submit_form_data:
-                                    try:
-                                        await self.page.wait_for_load_state("networkidle", timeout=20000) 
-                                        save_edit_form_btn = self.rules['save_edit_form_btn']
-                                        save_btn = self.page.locator(save_edit_form_btn)
+                                if new_status == "PREVIEW":
+                                    await self.open_septic_components()
+                                    result = await self.add_component(form_data=form_data)
+                                else:
+                                    log_info(f"Attempting to UPDATE...{type(form_data)}")
+                                    submit_form_data = await self.populate_form_data(form_data)
+                                    log_info(f"Attempting to click Edit Sava...{submit_form_data}")
+                                    result = False
+                                    if submit_form_data:
                                         try:
-                                            await save_btn.wait_for(state="visible", timeout=15000)
-                                            await save_btn.wait_for(state="attached", timeout=15000)
+                                            await self.page.wait_for_load_state("networkidle", timeout=20000) 
+                                            save_edit_form_btn = self.rules['save_edit_form_btn']
+                                            save_btn = self.page.locator(save_edit_form_btn)
+                                            try:
+                                                await save_btn.wait_for(state="visible", timeout=15000)
+                                                await save_btn.wait_for(state="attached", timeout=15000)
+                                            except:
+                                                pass
+                                            log_info("Attempting to click Edit Sava...")
+                                            async with self.page.expect_navigation(wait_until="networkidle"):
+                                                await save_btn.click()
+                                            result = True
+                                            log_info("click")
+                                            await self.page.wait_for_load_state("networkidle", timeout=20000) 
                                         except:
                                             pass
-                                        log_info("Attempting to click Edit Sava...")
-                                        async with self.page.expect_navigation(wait_until="networkidle"):
-                                            await save_btn.click()
-                                        result = True
-                                        log_info("click")
-                                        await self.page.wait_for_load_state("networkidle", timeout=20000) 
-                                    except:
-                                        pass
                                 return result 
                             else:
                                 log_error(f"Invalid status provided: {new_status}")

@@ -562,6 +562,54 @@ class WorkOrderTodayEditViewSet(viewsets.ModelViewSet):
         )
 
         # --- 2. Custom PATCH Method (Update specific fields) ---
+    
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='septic-component'
+    )
+    def preview_automation(self, request, *args, **kwargs):
+        """
+        🔥 This endpoint accepts data in body
+        ❌ Does NOT save anything in DB
+        ✅ Only runs automation / validation / dry-run
+        """
+        septic_component_form_data = request.data
+        work_order_today_id = kwargs.get('work_order_today_id')
+        instance = self.get_object()
+        full_address = instance.work_order_today.full_address
+        print()
+        try:
+            self._run_automation_script(
+                script_name='run_locked_deleted_edit_task.py',
+                argument=full_address,
+                new_status="PREVIEW",
+                work_order_today_id=work_order_today_id,
+                form_data=septic_component_form_data
+            )
+
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Automation preview executed successfully.",
+                    "received_data": {
+                        "form_data": {},
+                        "septic_components_form_data": {}
+                    }
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except subprocess.CalledProcessError as e:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Automation preview failed",
+                    "details": str(e)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
     def partial_update(self, request, *args, **kwargs):
         status_query = request.query_params.get('status')
 
