@@ -424,12 +424,21 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                     print(f"⚠️  Timeout waiting for search form (item {index})")
                     continue
                 
-                # Parse address
+                # Parse address and check wait_to_lock flag
                 work_order_edit_id = work_order.get('id')
                 full_address = work_order.get("full_address")
+                wait_to_lock = work_order.get('wait_to_lock', False)
+                
                 if not full_address:
                     print(f"⏭️  Skipping item {index}: No address provided.")
                     continue
+                
+                # Check if wait_to_lock is True
+                if wait_to_lock:
+                    print(f"⚠️  Skipping locked/discarded reports check for work order {work_order_edit_id}")
+                    print(f"   Reason: wait_to_lock = {wait_to_lock}")
+                    # Still fetch last report link and check work history
+                    work_orders[index - 1]['skip_locked_check'] = True
                 
                 # FIRST: Always fetch last report link
                 print(f"Fetching last report link for: {full_address}")
@@ -539,44 +548,60 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                         print(f"❌ Address not found in work history: {full_address}")
                         work_orders[index - 1]['tech_report_submitted'] = False
                         
-                        # Check locked reports if address not found in work history
-                        print("Checking locked reports...")
-                        if await self.select_locked_reports():
-                            result = await self.check_locked_reports(full_address=full_address)
-                            if result:
-                                await self.save_report_check_result(
-                                    result=result,
-                                    work_order_edit_id=work_order_edit_id
-                                )
-                                print("✅ Address found in locked reports.")
-                            else:
-                                # Check discarded reports if not in locked reports
-                                print("Checking discarded reports...")
-                                if await self.open_discarded_reports():
-                                    result = await self.check_discarded_reports(full_address=full_address)
-                                    if result:
-                                        await self.save_report_check_result(
-                                            result=result,
-                                            work_order_edit_id=work_order_edit_id
-                                        )
-                                        print("✅ Address found in discarded reports.")
-                                    else:
-                                        print("❌ Address not found in locked or discarded reports.")
-                                        # Update status to indicate not found
-                                        result = {
-                                            "status": "NOT_FOUND",
-                                            "finalized_by": "Automation",
-                                            "finalized_by_email": "automation@sterling-septic.com",
-                                            "finalized_date": timezone.now()
-                                        }
-                                        await self.save_report_check_result(
-                                            result=result,
-                                            work_order_edit_id=work_order_edit_id
-                                        )
-                                else:
-                                    print("❌ Failed to open discarded reports.")
+                        # Check if we should skip locked/discarded reports check
+                        if wait_to_lock:
+                            print(f"⚠️  Skipping locked/discarded reports check (wait_to_lock=True)")
+                            # Update status to indicate waiting for lock
+                            result = {
+                                "status": "WAITING_FOR_LOCK",
+                                "finalized_by": "Automation",
+                                "finalized_by_email": "automation@sterling-septic.com",
+                                "finalized_date": timezone.now()
+                            }
+                            await self.save_report_check_result(
+                                result=result,
+                                work_order_edit_id=work_order_edit_id
+                            )
+                            print("✅ Status set to WAITING_FOR_LOCK")
                         else:
-                            print("❌ Failed to select locked reports.")
+                            # Check locked reports if address not found in work history
+                            print("Checking locked reports...")
+                            if await self.select_locked_reports():
+                                result = await self.check_locked_reports(full_address=full_address)
+                                if result:
+                                    await self.save_report_check_result(
+                                        result=result,
+                                        work_order_edit_id=work_order_edit_id
+                                    )
+                                    print("✅ Address found in locked reports.")
+                                else:
+                                    # Check discarded reports if not in locked reports
+                                    print("Checking discarded reports...")
+                                    if await self.open_discarded_reports():
+                                        result = await self.check_discarded_reports(full_address=full_address)
+                                        if result:
+                                            await self.save_report_check_result(
+                                                result=result,
+                                                work_order_edit_id=work_order_edit_id
+                                            )
+                                            print("✅ Address found in discarded reports.")
+                                        else:
+                                            print("❌ Address not found in locked or discarded reports.")
+                                            # Update status to indicate not found
+                                            result = {
+                                                "status": "NOT_FOUND",
+                                                "finalized_by": "Automation",
+                                                "finalized_by_email": "automation@sterling-septic.com",
+                                                "finalized_date": timezone.now()
+                                            }
+                                            await self.save_report_check_result(
+                                                result=result,
+                                                work_order_edit_id=work_order_edit_id
+                                            )
+                                    else:
+                                        print("❌ Failed to open discarded reports.")
+                            else:
+                                print("❌ Failed to select locked reports.")
                 
                 except Exception as e:
                     print(f"❌ Error checking work history: {e}")
@@ -584,6 +609,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 print(f"✅ Processing completed for work order {index}")
                 print(f"   Last report link: {work_orders[index - 1].get('last_report_link')}")
                 print(f"   Tech report submitted: {work_orders[index - 1].get('tech_report_submitted')}")
+                print(f"   Wait to lock: {wait_to_lock}")
                 
             except Exception as e:
                 print(f"❌ Unexpected error processing item {index} ({full_address}): {e}")
@@ -592,6 +618,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                     work_orders[index - 1]['last_report_link'] = None
                 if 'tech_report_submitted' not in work_orders[index - 1]:
                     work_orders[index - 1]['tech_report_submitted'] = False
+                if 'skip_locked_check' not in work_orders[index - 1]:
+                    work_orders[index - 1]['skip_locked_check'] = False
         
         # Cleanup
         await self.cleanup()
