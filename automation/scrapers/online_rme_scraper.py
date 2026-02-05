@@ -9,6 +9,12 @@ except:
 from automation.utils.address_helpers import extract_address_details
 from tasks.helper.edit_task import OnlineRMEEditTaskHelper
 from datetime import datetime
+import asyncio
+from locates.models import WorkOrderToday
+from asgiref.sync import sync_to_async
+from django.utils import timezone
+
+
 
 class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
     """
@@ -276,7 +282,84 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         await self.page.locator('#leftmenu a:has-text("Septic Components")').click()
         await self.page.wait_for_selector("#ctl02_DataGridComponents")
         print("[INFO] Septic Components page opened.")
-        
+    
+    # ----- Select Locked Reports -----
+    async def select_locked_reports(self) -> bool:
+        try:
+            print("Selecting Locked Reports")
+            await self.page.select_option("#ctl02_drpViewing", value="True")
+            await self.page.wait_for_load_state("networkidle")
+            await self.page.wait_for_selector("#ctl02_DataGridOMhistory")
+            print("Locked Reports loaded")
+            return True
+        except Exception as e:
+            print(f"select_locked_reports error: {e}")
+            return False
+    
+    async def check_locked_reports(self, full_address:str):
+        print(f"Searching Locked Reports for address: {full_address}")
+        try:
+            rows = await self.page.locator("#ctl02_DataGridOMhistory tr").all()
+            print(f"Found {len(rows)} rows in Locked Reports")
+
+            for row in rows[1:]:
+                try:
+                    cells = await row.locator("td").all()
+                    if len(cells) >= 8:
+                        address = (await cells[6].text_content() or "").strip()
+                        if full_address.lower() in address.lower() or address.lower() in full_address.lower():
+                            current_time = timezone.now()
+                            print(f"Address LOCKED → {address}")
+                            return {
+                                "status": "LOCKED",
+                                "finalized_by": "Automation",
+                                "finalized_by_email": "automation@sterling-septic.com",
+                                "finalized_date": current_time
+                            }
+                except:
+                    continue
+        except Exception as e:
+            print(f"Address not found in Locked Reports: {e}")
+        return None
+    
+    # ----- Open Discarded Reports -----
+    async def open_discarded_reports(self):
+        try:
+            print("Opening Discarded Reports")
+            await self.page.click('div.SMChild >> text=Discarded Reports')  # click the menu
+            await self.page.wait_for_selector("#ctl02_DataGridDeletedHistory")
+            await asyncio.sleep(5)  # wait for table to fully render
+            print("Discarded Reports loaded")
+            return True
+        except Exception as e:
+            print(f"open_discarded_reports error: {e}")
+            return False
+     
+    async def check_discarded_reports(self, full_address:str):
+        print(f"Searching Discarded Reports for address: {full_address}")
+        try:
+            rows = await self.page.locator("#ctl02_DataGridDeletedHistory tr").all()
+            print(f"Found {len(rows)} rows in Discarded Reports")
+
+            for row in rows[2:]:  # skip header rows
+                try:
+                    cells = await row.locator("td").all()
+                    if len(cells) >= 5:
+                        address = (await cells[4].text_content() or "").strip()
+                        if full_address.lower() in address.lower() or address.lower() in full_address.lower():
+                            current_time = timezone.now()
+                            print(f"Address DELETED → {address}")
+                            return {
+                                "status": "DELETED",
+                                "finalized_by": "Automation",
+                                "finalized_by_email": "automation@sterling-septic.com",
+                                "finalized_date": current_time
+                            }
+                except:
+                    continue
+        except Exception as e:
+            print(f"Address not found in Discarded Reports: {e}")
+        return None
         
     async def scrape_components_table(self):
         try:
@@ -414,17 +497,36 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                     break
                     if address_status:
                         if work_order.get('tech_report_submitted') == True:
+                            print("tech_report_submitted: True")
+                            if await self.select_locked_reports():
+                                result = await self.check_locked_reports(full_address=full_address)
+                                if result:
+                                     await self.save_report_chaek_result(
+                                        result=result,
+                                        work_order_edit_id=work_order_edit_id
+                                    )
+                                else:
+                                    if await self.open_discarded_reports():
+                                        result = await self.check_discarded_reports(full_address=full_address)
+                                        if result:
+                                            await self.save_report_chaek_result(
+                                                result=result,
+                                                work_order_edit_id=work_order_edit_id
+                                            )
+                                        else:
+                                            print(f"Faild Result: check_discarded_reports")
+                            else:
+                                if await self.open_discarded_reports():
+                                    result = await self.check_discarded_reports()
+                                    if result:
+                                        await self.save_report_chaek_result(
+                                            result=result,
+                                            work_order_edit_id=work_order_edit_id
+                                        )
+                                    else:
+                                        print(f"Faild Result: check_discarded_reports")
+                        else:
                             print("Address match found in work history. Skipping tech report submission.")
-                            work_order['is_deleted'] = True
-                            work_order['deleted_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            work_order['deleted_by'] = "Automation"
-                            work_order['deleted_by_email'] = 'automation@sterling-septic.com'
-                        self.api_client.manage_work_orders(
-                            record_id=int(work_order_edit_id),
-                            data=work_order,
-                            method_type="PATCH"
-                            
-                        )
                 except Exception as e:
                     print("workorder_address_check")
             except Exception as e:
@@ -434,3 +536,24 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         await self.cleanup()
         
         return work_orders
+    
+    async def save_report_chaek_result(self, result, work_order_edit_id):
+        print(f"Final Result: {result}")
+        try:
+            await sync_to_async(self._save_report_check_result_sync)(
+                result, work_order_edit_id
+            )
+            print("Save database")
+        except Exception as e:
+            print(f"Save database Failed: {e}")
+
+            
+    def _save_report_check_result_sync(self, result, work_order_edit_id):
+        work_order_db = WorkOrderToday.objects.get(pk=work_order_edit_id)
+
+        work_order_db.status = result['status']
+        work_order_db.finalized_by = result['finalized_by']
+        work_order_db.finalized_by_email = result['finalized_by_email']
+        work_order_db.finalized_date = result['finalized_date']
+
+        work_order_db.save()
