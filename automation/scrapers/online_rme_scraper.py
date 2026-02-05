@@ -313,7 +313,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                 "status": "LOCKED",
                                 "finalized_by": "Automation",
                                 "finalized_by_email": "automation@sterling-septic.com",
-                                "finalized_date": current_time
+                                "finalized_date": current_time,
+                                "rme_completed": True  # ✅ Set rme_completed to True
                             }
                 except:
                     continue
@@ -352,7 +353,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                 "status": "DELETED",
                                 "finalized_by": "Automation",
                                 "finalized_by_email": "automation@sterling-septic.com",
-                                "finalized_date": current_time
+                                "finalized_date": current_time,
+                                "rme_completed": True  # ✅ Set rme_completed to True
                             }
                 except:
                     continue
@@ -531,6 +533,20 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                     )
                                     
                                     print("✅ Form data scraped and saved successfully.")
+                                    
+                                    # Also update rme_completed to True when form is scraped
+                                    result = {
+                                        "status": "FORM_SCRAPED",
+                                        "finalized_by": "Automation",
+                                        "finalized_by_email": "automation@sterling-septic.com",
+                                        "finalized_date": timezone.now(),
+                                        "rme_completed": True  # ✅ Set rme_completed to True
+                                    }
+                                    await self.save_report_check_result(
+                                        result=result,
+                                        work_order_edit_id=work_order_edit_id
+                                    )
+                                    
                                     break
                                     
                                 except Exception as click_err:
@@ -549,9 +565,11 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                             if wait_to_lock:
                                 reason = "wait_to_lock=True"
                                 status = "WAITING_FOR_LOCK"
+                                rme_completed = False  # Not completed yet
                             else:
                                 reason = "tech_report_submitted=True"
-                                status = "PROCESSING"  # or "FOUND_IN_WORK_HISTORY"
+                                status = "PROCESSING"
+                                rme_completed = False  # Not completed yet
                             
                             print(f"⚠️  Skipping locked/discarded reports check ({reason})")
                             
@@ -560,7 +578,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                 "status": status,
                                 "finalized_by": "Automation",
                                 "finalized_by_email": "automation@sterling-septic.com",
-                                "finalized_date": timezone.now()
+                                "finalized_date": timezone.now(),
+                                "rme_completed": rme_completed  # Set based on condition
                             }
                             await self.save_report_check_result(
                                 result=result,
@@ -596,7 +615,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                                 "status": "NOT_FOUND",
                                                 "finalized_by": "Automation",
                                                 "finalized_by_email": "automation@sterling-septic.com",
-                                                "finalized_date": timezone.now()
+                                                "finalized_date": timezone.now(),
+                                                "rme_completed": False  # Not completed
                                             }
                                             await self.save_report_check_result(
                                                 result=result,
@@ -614,7 +634,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 print(f"   Last report link: {work_orders[index - 1].get('last_report_link')}")
                 print(f"   Tech report submitted: {work_orders[index - 1].get('tech_report_submitted')}")
                 print(f"   Wait to lock: {wait_to_lock}")
-                print(f"   Skip locked check: {should_skip_locked_check}")
+                if 'should_skip_locked_check' in locals():
+                    print(f"   Skip locked check: {should_skip_locked_check}")
                 
             except Exception as e:
                 print(f"❌ Unexpected error processing item {index} ({full_address}): {e}")
@@ -647,5 +668,9 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         work_order_db.finalized_by = result['finalized_by']
         work_order_db.finalized_by_email = result['finalized_by_email']
         work_order_db.finalized_date = result['finalized_date']
+        
+        # ✅ Set rme_completed based on the result
+        work_order_db.rme_completed = result.get('rme_completed', False)
 
         work_order_db.save()
+        print(f"✅ Updated rme_completed to: {result.get('rme_completed', False)}")
