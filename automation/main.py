@@ -8,7 +8,6 @@ from automation.scrapers.fieldedge_scraper import FieldEdgeScraper
 from automation.scrapers.work_orders_scraper import WorkOrdersScraper
 from automation.scrapers.online_rme_scraper import OnlineRMEScraper
 
-
 async def run_fieldedge_scraper():
     """Execute FieldEdge scraping workflow."""
     print("=== Starting FieldEdge Scraper ===")
@@ -76,10 +75,10 @@ async def run_online_rme_scraper():
         print(f"RME records to process: {record_count}")
         
         if work_orders_missing_urls:
-            updated_records = await scraper.run(work_orders_missing_urls)
-            del scraper
+            # updated_records = await scraper.run(work_orders_missing_urls)
+            # del scraper
             scraper = OnlineRMEScraper()
-            await scraper.workorder_address_check_and_get_form(updated_records)
+            await scraper.workorder_address_check_and_get_form(work_orders_missing_urls)
             print("RME data patching completed.")
         else:
             print("No RME records found to update.")
@@ -96,8 +95,8 @@ async def run_online_rme_scraper():
 
 async def main():
     """Main execution flow - runs all scrapers in sequence."""
-    await run_fieldedge_scraper()
-    await run_work_orders_scraper()
+    # await run_fieldedge_scraper()
+    # await run_work_orders_scraper()
     await run_online_rme_scraper()
 
 

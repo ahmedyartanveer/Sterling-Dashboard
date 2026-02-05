@@ -271,6 +271,43 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         
         return work_orders
     
+    # ---------------- OPEN SEPTIC COMPONENTS ----------------
+    async def open_septic_components(self):
+        await self.page.locator('#leftmenu a:has-text("Septic Components")').click()
+        await self.page.wait_for_selector("#ctl02_DataGridComponents")
+        print("[INFO] Septic Components page opened.")
+        
+        
+    async def scrape_components_table(self):
+        try:
+            print("[INFO] Scraping components table...")
+
+            rows = await self.page.locator("#ctl02_DataGridComponents tr").all()
+            data = []
+
+            def clean(text):
+                return text.strip() if text and text.strip() != "\xa0" else None
+
+            for row in rows[1:]:  # skip header
+                cells = await row.locator("td").all()
+                if len(cells) < 8:
+                    continue
+                record = {
+                    "component": clean(await cells[1].text_content()),
+                    "userDefinedLabel": clean(await cells[2].text_content()),
+                    "manufacturer": clean(await cells[3].text_content()),
+                    "model": clean(await cells[4].text_content()),
+                    "serial": clean(await cells[5].text_content()),
+                    "tankSize": clean(await cells[6].text_content()),
+                    "sortOrder": clean(await cells[7].text_content())
+                }
+                data.append(record)
+
+            return data if data else []
+        except Exception as e:
+            print(f"[Error] Septic Components page {e}.")
+            return []
+    
     async def workorder_address_check_and_get_form(self, work_orders):
         """
         Process multiple work orders to fetch report links.
@@ -312,17 +349,9 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                     print(f"⏭️  Skipping item {index}: No address provided.")
                     continue
                 
-                street_number, street_name = extract_address_details(full_address)
-                if not street_number or not street_name:
-                    continue
-                
                 rme_work_history_url = self.rules.get('rme_work_history_url')
                 table_selector = self.rules.get("wait_work_history_table")
                 rows_selector = self.rules.get("work_history_table_xpath")
-
-                if not all([rme_work_history_url, table_selector, rows_selector]):
-                    print("Configuration Error: Missing URLs or XPaths in rules.")
-                    return False
                 
                 try:
                     # Navigate to page
@@ -334,13 +363,12 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                         await self.page.wait_for_selector(table_selector, state='visible', timeout=10000)
                     except Exception:
                         print("Work history table did not appear (Timeout).")
-                        return False
 
                     # Get all rows
                     rows = await self.page.locator(rows_selector).all()
                     if not rows:
                         print("Table found but it has no rows.")
-                        return False
+                        continue
                     print(f"Table loaded. Checking {len(rows)} rows for address match...")
                     # Normalize search string
                     full_address_lower = full_address.strip().lower()
@@ -366,7 +394,6 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                             if clean_addr_text.lower() in full_address_lower:
                                 print(f"Match found at row {index + 1}: {clean_addr_text}")
                                 address_status = False
-                                
                                 try:
                                     get_item = columns.nth(10) 
                                     click_item = get_item.locator('input')
@@ -374,10 +401,17 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                     await click_item.click(timeout=5000)
                                     await self.page.wait_for_load_state("networkidle", timeout=20000) 
                                     get_form_data = await self.scrape_edit_form_data()
-                                    if len(get_form_data) != 0:
-                                        self.api_client.work_order_today_edit(get_form_data, int(work_order_edit_id))
+                                    await self.open_septic_components()
+                                    septic_components_form_data = await self.scrape_components_table()
+                                    if len(get_form_data) == 0:
+                                        get_form_data = []
+                                    if len(septic_components_form_data) == 0:
+                                        septic_components_form_data = []
+                                    self.api_client.work_order_today_edit(get_form_data, septic_components_form_data, int(work_order_edit_id))
+                                    break
                                 except Exception as click_err:
                                     print(f"Error performing action: {click_err}")
+                                    break
                     if address_status:
                         if work_order.get('tech_report_submitted') == True:
                             print("Address match found in work history. Skipping tech report submission.")

@@ -263,7 +263,7 @@ class APIClient:
             return None
     
     
-    def work_order_today_edit(self, form_data, work_order_today_id):
+    def work_order_today_edit(self, form_data, septic_components_form_data, work_order_today_id):
         """
         Update work order today edit data (PATCH).
 
@@ -280,10 +280,13 @@ class APIClient:
 
         url = f"{self.base_url}work-order-edit/{work_order_today_id}/?status=UPDATE"
 
+        
         payload = {
             "form_data": form_data,
+            "septic_components_form_data": septic_components_form_data,
             "work_order_today": work_order_today_id
         }
+        
 
         print(f"Sending PATCH request to: {url}")
 

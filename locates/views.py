@@ -578,13 +578,16 @@ class WorkOrderTodayEditViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-            print("request.data", request.data)
             form_data = request.data.get('form_data', [])
+            septic_components_form_data =  request.data.get('septic_components_form_data', [])
             
             # use update_or_create — sets `created` correctly and gives back the instance
             instance, created = WorkOrderTodayEdit.objects.update_or_create(
                 work_order_today=work_order_today_instance,
-                defaults={'form_data': form_data}
+                defaults={
+                    'form_data': form_data, 
+                    'septic_components_form_data':septic_components_form_data
+                }
             )
 
             serializer = self.get_serializer(instance)

@@ -71,6 +71,7 @@ class WorkOrderTodayEdit(models.Model):
         related_name='edit_data' 
     )
     form_data = models.JSONField(default=list, blank=True)
+    septic_components_form_data = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
