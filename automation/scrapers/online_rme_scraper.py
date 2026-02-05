@@ -249,11 +249,13 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 # Search for property
                 await self.search_property(street_number, street_name)
                 
-                # Always fetch last report link regardless of tech_report_submitted status
+                # ALWAYS fetch last report link regardless of any other conditions
                 last_report_link = await self.fetch_last_report_link()
                 if last_report_link:
                     work_orders[index - 1]['last_report_link'] = last_report_link
                     print(f"✅ Last report link updated: {last_report_link}")
+                else:
+                    print("⚠️  No last report link found")
                 
                 # Check if address exists in work history (tech report submitted)
                 tech_report_submitted = await self.address_match_in_work_history(full_address)
@@ -435,8 +437,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                     print(f"⏭️  Skipping item {index}: No address provided.")
                     continue
                 
-                # FIRST: Always fetch last report link
-                print(f"Fetching last report link for: {full_address}")
+                # STEP 1: ALWAYS fetch last report link FIRST
+                print(f"📎 STEP 1: Fetching last report link for: {full_address}")
                 street_number, street_name = extract_address_details(full_address)
                 if not street_number or not street_name:
                     print(f"⏭️  Skipping item {index}: Could not parse address.")
@@ -448,11 +450,23 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 # Fetch last report link
                 last_report_link = await self.fetch_last_report_link()
                 if last_report_link:
+                    # Always update the work order with the new link
                     work_orders[index - 1]['last_report_link'] = last_report_link
                     print(f"✅ Last report link updated: {last_report_link}")
+                    
+                    # Also update the database with the last report link
+                    try:
+                        await sync_to_async(self._update_last_report_link_in_db)(
+                            work_order_edit_id, last_report_link
+                        )
+                        print(f"✅ Last report link saved to database")
+                    except Exception as db_error:
+                        print(f"⚠️  Could not save last report link to database: {db_error}")
+                else:
+                    print("⚠️  No last report link found")
                 
-                # SECOND: Check work history for address match
-                print(f"Checking work history for address: {full_address}")
+                # STEP 2: Check work history for address match
+                print(f"📎 STEP 2: Checking work history for address: {full_address}")
                 rme_work_history_url = self.rules.get('rme_work_history_url')
                 table_selector = self.rules.get("wait_work_history_table")
                 rows_selector = self.rules.get("work_history_table_xpath")
@@ -587,8 +601,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                             )
                             print(f"✅ Status set to {status}")
                         else:
-                            # Check locked reports if address not found in work history
-                            print("Checking locked reports...")
+                            # STEP 3: Check locked reports if address not found in work history
+                            print(f"📎 STEP 3: Checking locked/discarded reports for: {full_address}")
                             if await self.select_locked_reports():
                                 result = await self.check_locked_reports(full_address=full_address)
                                 if result:
@@ -649,6 +663,17 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         await self.cleanup()
         
         return work_orders
+    
+    def _update_last_report_link_in_db(self, work_order_edit_id, last_report_link):
+        """Update the last report link in the database."""
+        try:
+            work_order_db = WorkOrderToday.objects.get(pk=work_order_edit_id)
+            work_order_db.last_report_link = last_report_link
+            work_order_db.save()
+            return True
+        except Exception as e:
+            print(f"Error updating last report link in database: {e}")
+            return False
     
     async def save_report_check_result(self, result, work_order_edit_id):
         print(f"Final Result: {result}")
