@@ -1,3 +1,15 @@
+
+import os
+import django
+
+os.environ.setdefault(
+    "DJANGO_SETTINGS_MODULE",
+    "Sterling_Dashboard.settings"  # ⚠️ তোমার project settings path
+)
+
+django.setup()
+
+
 import sys
 import asyncio
 import os, json
