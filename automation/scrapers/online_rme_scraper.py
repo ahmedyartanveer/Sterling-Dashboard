@@ -571,19 +571,33 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                         print(f"❌ Address not found in work history: {full_address}")
                         work_orders[index - 1]['tech_report_submitted'] = False
                         
+                        # Get current rme_completed status
+                        current_rme_completed = work_orders[index - 1].get('rme_completed', True)
+                        
                         # Check if we should skip locked/discarded reports check
-                        # Skip if either: 1) wait_to_lock=True OR 2) tech_report_submitted=True
-                        should_skip_locked_check = wait_to_lock or work_orders[index - 1].get('tech_report_submitted', False)
+                        # Skip if ANY of these is true:
+                        # 1) tech_report_submitted=True (tech submitted report)
+                        # 2) wait_to_lock=True (waiting for tech to lock report)
+                        # 3) rme_completed=False (RME not completed yet)
+                        should_skip_locked_check = (
+                            work_orders[index - 1].get('tech_report_submitted', False) or 
+                            wait_to_lock or 
+                            not current_rme_completed
+                        )
                         
                         if should_skip_locked_check:
+                            # Determine the specific reason
                             if wait_to_lock:
                                 reason = "wait_to_lock=True"
                                 status = "WAITING_FOR_LOCK"
-                                rme_completed = False  # Not completed yet
-                            else:
+                            elif work_orders[index - 1].get('tech_report_submitted', False):
                                 reason = "tech_report_submitted=True"
                                 status = "PROCESSING"
-                                rme_completed = False  # Not completed yet
+                            else:  # rme_completed=False
+                                reason = "rme_completed=False"
+                                status = "INCOMPLETE"
+                            
+                            rme_completed = False  # Keep as False
                             
                             print(f"⚠️  Skipping locked/discarded reports check ({reason})")
                             
@@ -593,7 +607,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                 "finalized_by": "Automation",
                                 "finalized_by_email": "automation@sterling-septic.com",
                                 "finalized_date": timezone.now(),
-                                "rme_completed": rme_completed  # Set based on condition
+                                "rme_completed": rme_completed
                             }
                             await self.save_report_check_result(
                                 result=result,
@@ -601,7 +615,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                             )
                             print(f"✅ Status set to {status}")
                         else:
-                            # STEP 3: Check locked reports if address not found in work history
+                            # Only check locked/discarded reports if NONE of the skip conditions are met
+                            # STEP 3: Check locked/discarded reports
                             print(f"📎 STEP 3: Checking locked/discarded reports for: {full_address}")
                             if await self.select_locked_reports():
                                 result = await self.check_locked_reports(full_address=full_address)
@@ -648,8 +663,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 print(f"   Last report link: {work_orders[index - 1].get('last_report_link')}")
                 print(f"   Tech report submitted: {work_orders[index - 1].get('tech_report_submitted')}")
                 print(f"   Wait to lock: {wait_to_lock}")
-                if 'should_skip_locked_check' in locals():
-                    print(f"   Skip locked check: {should_skip_locked_check}")
+                print(f"   RME completed: {work_orders[index - 1].get('rme_completed', True)}")
+                print(f"   Skip locked check: {'should_skip_locked_check' in locals()}")
                 
             except Exception as e:
                 print(f"❌ Unexpected error processing item {index} ({full_address}): {e}")
