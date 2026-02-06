@@ -49,44 +49,89 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         
         return normalized.strip()
     
+    def extract_street_number_and_base(self, address: str) -> tuple:
+        """
+        Extract street number and base street name from address.
+        Example: "9027 206th St Ct E" -> ("9027", "206th")
+        Example: "9027 206th" -> ("9027", "206th")
+        """
+        normalized = self.normalize_address_for_matching(address)
+        
+        # Extract street number (first sequence of digits)
+        num_match = re.search(r'^(\d+)', normalized)
+        if not num_match:
+            return (None, None)
+        
+        street_number = num_match.group(1)
+        
+        # Extract base street name (next word/number combo, typically street name)
+        # Pattern: number followed by optional letters/ordinal indicators
+        street_match = re.search(r'^\d+\s+(\d+\w*)', normalized)
+        if street_match:
+            base_street = street_match.group(1)
+            return (street_number, base_street)
+        
+        # If no number pattern, get first word after street number
+        street_match = re.search(r'^\d+\s+(\w+)', normalized)
+        if street_match:
+            base_street = street_match.group(1)
+            return (street_number, base_street)
+        
+        return (street_number, None)
+    
     def addresses_match(self, addr1: str, addr2: str) -> bool:
         """
         Check if two addresses match with flexible comparison.
+        Examples that should match:
+        - "9027 206th" matches "9027 206th St Ct E, Graham WA 98338"
+        - "9027 206th St" matches "9027 206th Street Court"
         """
         norm1 = self.normalize_address_for_matching(addr1)
         norm2 = self.normalize_address_for_matching(addr2)
         
+        print(f"   Comparing: '{norm1}' <-> '{norm2}'")
+        
         # Direct substring match
         if norm1 in norm2 or norm2 in norm1:
+            print(f"   ✅ Direct substring match")
             return True
         
-        # Extract and compare street numbers
-        try:
-            num1_match = re.search(r'^\d+', norm1)
-            num2_match = re.search(r'^\d+', norm2)
-            
-            if num1_match and num2_match:
-                num1 = num1_match.group()
-                num2 = num2_match.group()
-                
-                # Numbers must match
-                if num1 == num2:
-                    # Get the street name parts (everything after the number)
-                    street1 = re.sub(r'^\d+\s*', '', norm1)
-                    street2 = re.sub(r'^\d+\s*', '', norm2)
-                    
-                    # Remove directionals and unit numbers for comparison
-                    street1 = re.sub(r'\s*[nsew]\s*$', '', street1)
-                    street2 = re.sub(r'\s*[nsew]\s*$', '', street2)
-                    street1 = re.sub(r'\s*#.*$', '', street1)
-                    street2 = re.sub(r'\s*#.*$', '', street2)
-                    
-                    # Check if street names match
-                    if street1 in street2 or street2 in street1:
-                        return True
-        except:
-            pass
+        # Extract street number and base street name
+        num1, base1 = self.extract_street_number_and_base(addr1)
+        num2, base2 = self.extract_street_number_and_base(addr2)
         
+        print(f"   Extracted: ({num1}, {base1}) <-> ({num2}, {base2})")
+        
+        # Both must have street numbers
+        if not num1 or not num2:
+            print(f"   ❌ Missing street number")
+            return False
+        
+        # Street numbers must match
+        if num1 != num2:
+            print(f"   ❌ Street numbers don't match")
+            return False
+        
+        # If both have base street names, they must match
+        if base1 and base2:
+            # Normalize further for comparison
+            base1_clean = re.sub(r'(st|street|ct|court|dr|drive|ave|avenue|rd|road|ln|lane).*$', '', base1)
+            base2_clean = re.sub(r'(st|street|ct|court|dr|drive|ave|avenue|rd|road|ln|lane).*$', '', base2)
+            
+            if base1_clean in base2_clean or base2_clean in base1_clean:
+                print(f"   ✅ Street numbers and base names match")
+                return True
+            else:
+                print(f"   ❌ Base street names don't match: '{base1_clean}' vs '{base2_clean}'")
+                return False
+        
+        # If one doesn't have base street but numbers match
+        # This handles cases like "9027" matching "9027 206th St"
+        if num1 == num2:
+            print(f"   ✅ Street numbers match (partial address)")
+            return True
+        
+        print(f"   ❌ No match found")
         return False
     
     async def ensure_authenticated(self):
@@ -602,6 +647,10 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                         )
                                         
                                         print("✅ Form data scraped and saved successfully for WORK HISTORY match.")
+                                        
+                                        # Update tech_report_submitted = True in database
+                                        await self.update_tech_report_submitted(work_order_edit_id, True)
+                                        
                                         break
                                         
                                     except Exception as click_err:
@@ -699,6 +748,24 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         
         return work_orders
     
+    async def update_tech_report_submitted(self, work_order_edit_id, value: bool):
+        """Update tech_report_submitted field in database."""
+        print(f"\n💾 Updating tech_report_submitted to {value}...")
+        print(f"   Work Order ID: {work_order_edit_id}")
+        try:
+            await sync_to_async(self._update_tech_report_submitted_sync)(
+                work_order_edit_id, value
+            )
+            print("✅ tech_report_submitted updated successfully.")
+        except Exception as e:
+            print(f"❌ Failed to update tech_report_submitted: {e}")
+    
+    def _update_tech_report_submitted_sync(self, work_order_edit_id, value: bool):
+        """Synchronous tech_report_submitted update operation."""
+        work_order_db = WorkOrderToday.objects.get(pk=work_order_edit_id)
+        work_order_db.tech_report_submitted = value
+        work_order_db.save()
+    
     async def save_report_check_result(self, result, work_order_edit_id):
         """Save the report check result to database."""
         print(f"\n💾 Saving to database...")
@@ -721,5 +788,10 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         work_order_db.finalized_by = result['finalized_by']
         work_order_db.finalized_by_email = result['finalized_by_email']
         work_order_db.finalized_date = result['finalized_date']
+        
+        # Set rme_completed to True when status is LOCKED or DELETED
+        if result['status'] in ['LOCKED', 'DELETED']:
+            work_order_db.rme_completed = True
+            print(f"   🔒 Setting rme_completed=True for status: {result['status']}")
 
         work_order_db.save()
