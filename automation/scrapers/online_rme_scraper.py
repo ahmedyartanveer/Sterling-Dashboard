@@ -249,13 +249,11 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 # Search for property
                 await self.search_property(street_number, street_name)
                 
-                # ALWAYS fetch last report link regardless of any other conditions
+                # Always fetch last report link regardless of tech_report_submitted status
                 last_report_link = await self.fetch_last_report_link()
                 if last_report_link:
                     work_orders[index - 1]['last_report_link'] = last_report_link
                     print(f"✅ Last report link updated: {last_report_link}")
-                else:
-                    print("⚠️  No last report link found")
                 
                 # Check if address exists in work history (tech report submitted)
                 tech_report_submitted = await self.address_match_in_work_history(full_address)
@@ -315,8 +313,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                 "status": "LOCKED",
                                 "finalized_by": "Automation",
                                 "finalized_by_email": "automation@sterling-septic.com",
-                                "finalized_date": current_time,
-                                "rme_completed": True  # ✅ Set rme_completed to True
+                                "finalized_date": current_time
                             }
                 except:
                     continue
@@ -355,8 +352,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                 "status": "DELETED",
                                 "finalized_by": "Automation",
                                 "finalized_by_email": "automation@sterling-septic.com",
-                                "finalized_date": current_time,
-                                "rme_completed": True  # ✅ Set rme_completed to True
+                                "finalized_date": current_time
                             }
                 except:
                     continue
@@ -437,8 +433,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                     print(f"⏭️  Skipping item {index}: No address provided.")
                     continue
                 
-                # STEP 1: ALWAYS fetch last report link FIRST
-                print(f"📎 STEP 1: Fetching last report link for: {full_address}")
+                # FIRST: Always fetch last report link
+                print(f"Fetching last report link for: {full_address}")
                 street_number, street_name = extract_address_details(full_address)
                 if not street_number or not street_name:
                     print(f"⏭️  Skipping item {index}: Could not parse address.")
@@ -450,23 +446,11 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 # Fetch last report link
                 last_report_link = await self.fetch_last_report_link()
                 if last_report_link:
-                    # Always update the work order with the new link
                     work_orders[index - 1]['last_report_link'] = last_report_link
                     print(f"✅ Last report link updated: {last_report_link}")
-                    
-                    # Also update the database with the last report link
-                    try:
-                        await sync_to_async(self._update_last_report_link_in_db)(
-                            work_order_edit_id, last_report_link
-                        )
-                        print(f"✅ Last report link saved to database")
-                    except Exception as db_error:
-                        print(f"⚠️  Could not save last report link to database: {db_error}")
-                else:
-                    print("⚠️  No last report link found")
                 
-                # STEP 2: Check work history for address match
-                print(f"📎 STEP 2: Checking work history for address: {full_address}")
+                # SECOND: Check work history for address match
+                print(f"Checking work history for address: {full_address}")
                 rme_work_history_url = self.rules.get('rme_work_history_url')
                 table_selector = self.rules.get("wait_work_history_table")
                 rows_selector = self.rules.get("work_history_table_xpath")
@@ -547,20 +531,6 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                     )
                                     
                                     print("✅ Form data scraped and saved successfully.")
-                                    
-                                    # Also update rme_completed to True when form is scraped
-                                    result = {
-                                        "status": "FORM_SCRAPED",
-                                        "finalized_by": "Automation",
-                                        "finalized_by_email": "automation@sterling-septic.com",
-                                        "finalized_date": timezone.now(),
-                                        "rme_completed": True  # ✅ Set rme_completed to True
-                                    }
-                                    await self.save_report_check_result(
-                                        result=result,
-                                        work_order_edit_id=work_order_edit_id
-                                    )
-                                    
                                     break
                                     
                                 except Exception as click_err:
@@ -571,33 +541,17 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                         print(f"❌ Address not found in work history: {full_address}")
                         work_orders[index - 1]['tech_report_submitted'] = False
                         
-                        # Get current rme_completed status
-                        current_rme_completed = work_orders[index - 1].get('rme_completed', True)
-                        
                         # Check if we should skip locked/discarded reports check
-                        # Skip if ANY of these is true:
-                        # 1) tech_report_submitted=True (tech submitted report)
-                        # 2) wait_to_lock=True (waiting for tech to lock report)
-                        # 3) rme_completed=False (RME not completed yet)
-                        should_skip_locked_check = (
-                            work_orders[index - 1].get('tech_report_submitted', False) or 
-                            wait_to_lock or 
-                            not current_rme_completed
-                        )
+                        # Skip if either: 1) wait_to_lock=True OR 2) tech_report_submitted=True
+                        should_skip_locked_check = wait_to_lock or work_orders[index - 1].get('tech_report_submitted', False)
                         
                         if should_skip_locked_check:
-                            # Determine the specific reason
                             if wait_to_lock:
                                 reason = "wait_to_lock=True"
                                 status = "WAITING_FOR_LOCK"
-                            elif work_orders[index - 1].get('tech_report_submitted', False):
+                            else:
                                 reason = "tech_report_submitted=True"
-                                status = "PROCESSING"
-                            else:  # rme_completed=False
-                                reason = "rme_completed=False"
-                                status = "INCOMPLETE"
-                            
-                            rme_completed = False  # Keep as False
+                                status = "PROCESSING" 
                             
                             print(f"⚠️  Skipping locked/discarded reports check ({reason})")
                             
@@ -606,8 +560,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                 "status": status,
                                 "finalized_by": "Automation",
                                 "finalized_by_email": "automation@sterling-septic.com",
-                                "finalized_date": timezone.now(),
-                                "rme_completed": rme_completed
+                                "finalized_date": timezone.now()
                             }
                             await self.save_report_check_result(
                                 result=result,
@@ -615,9 +568,8 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                             )
                             print(f"✅ Status set to {status}")
                         else:
-                            # Only check locked/discarded reports if NONE of the skip conditions are met
-                            # STEP 3: Check locked/discarded reports
-                            print(f"📎 STEP 3: Checking locked/discarded reports for: {full_address}")
+                            # Check locked reports if address not found in work history
+                            print("Checking locked reports...")
                             if await self.select_locked_reports():
                                 result = await self.check_locked_reports(full_address=full_address)
                                 if result:
@@ -644,8 +596,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                                                 "status": "NOT_FOUND",
                                                 "finalized_by": "Automation",
                                                 "finalized_by_email": "automation@sterling-septic.com",
-                                                "finalized_date": timezone.now(),
-                                                "rme_completed": False  # Not completed
+                                                "finalized_date": timezone.now()
                                             }
                                             await self.save_report_check_result(
                                                 result=result,
@@ -663,8 +614,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 print(f"   Last report link: {work_orders[index - 1].get('last_report_link')}")
                 print(f"   Tech report submitted: {work_orders[index - 1].get('tech_report_submitted')}")
                 print(f"   Wait to lock: {wait_to_lock}")
-                print(f"   RME completed: {work_orders[index - 1].get('rme_completed', True)}")
-                print(f"   Skip locked check: {'should_skip_locked_check' in locals()}")
+                print(f"   Skip locked check: {should_skip_locked_check}")
                 
             except Exception as e:
                 print(f"❌ Unexpected error processing item {index} ({full_address}): {e}")
@@ -678,17 +628,6 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         await self.cleanup()
         
         return work_orders
-    
-    def _update_last_report_link_in_db(self, work_order_edit_id, last_report_link):
-        """Update the last report link in the database."""
-        try:
-            work_order_db = WorkOrderToday.objects.get(pk=work_order_edit_id)
-            work_order_db.last_report_link = last_report_link
-            work_order_db.save()
-            return True
-        except Exception as e:
-            print(f"Error updating last report link in database: {e}")
-            return False
     
     async def save_report_check_result(self, result, work_order_edit_id):
         print(f"Final Result: {result}")
@@ -708,9 +647,5 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         work_order_db.finalized_by = result['finalized_by']
         work_order_db.finalized_by_email = result['finalized_by_email']
         work_order_db.finalized_date = result['finalized_date']
-        
-        # ✅ Set rme_completed based on the result
-        work_order_db.rme_completed = result.get('rme_completed', False)
 
         work_order_db.save()
-        print(f"✅ Updated rme_completed to: {result.get('rme_completed', False)}")
