@@ -20,7 +20,7 @@ class TankRepairFilter(django_filters.FilterSet):
 
 
 class TankRepairViewSet(viewsets.ModelViewSet):
-    queryset = TankRepair.objects.filter(is_deleted=False)
+    queryset = TankRepair.objects.all()
     serializer_class = TankRepairSerializer
 
     filter_backends = [
@@ -32,3 +32,4 @@ class TankRepairViewSet(viewsets.ModelViewSet):
     filterset_class = TankRepairFilter
     search_fields = "__all__"
     ordering_fields = "__all__"
+
