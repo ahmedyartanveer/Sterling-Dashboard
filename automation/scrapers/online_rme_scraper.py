@@ -360,13 +360,18 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 if last_report_link:
                     work_orders[index - 1]['last_report_link'] = last_report_link
                     print(f"✅ Last report link updated: {last_report_link}")
+                else:
+                    # Use service history URL as fallback when last report link is not found
+                    fallback_url = self.rules.get('rme_service_history')
+                    work_orders[index - 1]['last_report_link'] = fallback_url
+                    print(f"⚠️  Last report link not found, using service history URL: {fallback_url}")
                 
                 # Check if address exists in work history (tech report submitted)
                 tech_report_submitted = await self.address_match_in_work_history(full_address)
                 work_orders[index - 1]['tech_report_submitted'] = tech_report_submitted
                 
                 print(f"✅ Processing completed for: {full_address}")
-                print(f"   Last report link: {last_report_link}")
+                print(f"   Last report link: {work_orders[index - 1]['last_report_link']}")
                 print(f"   Tech report submitted: {tech_report_submitted}")
             
             except Exception as e:
@@ -512,6 +517,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         """
         Process multiple work orders to fetch report links and form data.
         Updated logic: Update database immediately when address found in any table.
+        Skip all processing if rme_completed is True.
         
         Args:
             work_orders: List of work order dictionaries with addresses
@@ -528,6 +534,23 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
             print(f"\n📄 Processing work order {index}/{total_count}...")
             
             try:
+                # Parse address and check conditions
+                work_order_edit_id = work_order.get('id')
+                full_address = work_order.get("full_address")
+                wait_to_lock = work_order.get('wait_to_lock', False)
+                rme_completed = work_order.get('rme_completed', False)
+                
+                if not full_address:
+                    print(f"⏭️  Skipping item {index}: No address provided.")
+                    continue
+                
+                # ✅ SKIP ALL PROCESSING if rme_completed is True
+                if rme_completed:
+                    print(f"⏭️  Skipping item {index}: rme_completed=True (already finalized)")
+                    print(f"   Address: {full_address}")
+                    print(f"   Status: Already completed - no further checks needed")
+                    continue
+                
                 # Ensure authentication before each operation
                 await self.ensure_authenticated()
                 
@@ -543,21 +566,13 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                     print(f"⚠️  Timeout waiting for search form (item {index})")
                     continue
                 
-                # Parse address and check conditions
-                work_order_edit_id = work_order.get('id')
-                full_address = work_order.get("full_address")
-                wait_to_lock = work_order.get('wait_to_lock', False)
-                
-                if not full_address:
-                    print(f"⏭️  Skipping item {index}: No address provided.")
-                    continue
-                
-                # FIRST: Always fetch last report link
-                print(f"Fetching last report link for: {full_address}")
                 street_number, street_name = extract_address_details(full_address)
                 if not street_number or not street_name:
                     print(f"⏭️  Skipping item {index}: Could not parse address.")
                     continue
+                
+                # FIRST: Always fetch last report link
+                print(f"Fetching last report link for: {full_address}")
                 
                 # Search for property
                 await self.search_property(street_number, street_name)
@@ -567,6 +582,11 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 if last_report_link:
                     work_orders[index - 1]['last_report_link'] = last_report_link
                     print(f"✅ Last report link updated: {last_report_link}")
+                else:
+                    # Use service history URL as fallback when last report link is not found
+                    fallback_url = self.rules.get('rme_service_history')
+                    work_orders[index - 1]['last_report_link'] = fallback_url
+                    print(f"⚠️  Last report link not found, using service history URL: {fallback_url}")
                 
                 # SECOND: Check work history for address match
                 print(f"\n🔍 Checking work history for address: {full_address}")
@@ -733,6 +753,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 print(f"   Last report link: {work_orders[index - 1].get('last_report_link')}")
                 print(f"   Tech report submitted: {work_orders[index - 1].get('tech_report_submitted')}")
                 print(f"   Wait to lock: {wait_to_lock}")
+                print(f"   RME completed: {rme_completed}")
                 print(f"   Address found: {address_found_in_any_table}")
                 
             except Exception as e:
@@ -747,6 +768,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
         await self.cleanup()
         
         return work_orders
+    
     
     async def update_tech_report_submitted(self, work_order_edit_id, value: bool):
         """Update tech_report_submitted field in database."""
