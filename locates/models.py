@@ -41,9 +41,12 @@ class WorkOrderToday(models.Model):
     deleted_by_email = models.EmailField(max_length=255, null=True, blank=True, help_text="Email of the user who deleted the record")
     deleted_date = models.DateTimeField(null=True, blank=True, help_text="Date of deletion")
     is_deleted = models.BooleanField(null=True, blank=True, default=False, help_text="Soft delete flag")
+    
+    task_name = models.CharField(max_length=100, null=True, blank=True, help_text="Current task of the work order")
 
     # Completion Information
     rme_completed = models.BooleanField(null=True, blank=True, default=False, help_text="Is RME completed?")
+    elapsed_time_rme_completed = models.DateTimeField(max_length=100, null=True, blank=True, help_text="RME Completed Time elapsed as a string")
 
     # Finalization Information
     finalized_by = models.CharField(max_length=255, null=True, blank=True, help_text="User who finalized the order")

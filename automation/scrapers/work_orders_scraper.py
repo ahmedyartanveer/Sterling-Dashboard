@@ -58,7 +58,7 @@ class WorkOrdersScraper(BaseScraper):
                                     purchase_order: getText(2),
                                     invoice: getText(3),
                                     quote: getText(4),
-                                    task: getText(5),
+                                    task_name: getText(5),
                                     status: getText(6),
                                     appointment_date: getText(7),
                                     scheduled_date: getText(8),

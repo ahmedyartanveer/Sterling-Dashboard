@@ -808,6 +808,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
             # Set rme_completed for DELETED status or when explicitly set
             if result.get("rme_completed") or result.get("status") == "DELETED":
                 work_order.rme_completed = True
+                work_order.elapsed_time_rme_completed = timezone.now().isoformat()
                 print(f"   ✓ Updated rme_completed=True")
                 changes_made = True
             
