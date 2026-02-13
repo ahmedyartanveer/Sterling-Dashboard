@@ -14,19 +14,15 @@
     "username_xpath": "input[name='UserName']",
     "password_xpath": "input[name='Password']",
     "login_button_xpath": "input[type='submit'][value='Sign in to your account']",
-
     "_comment_status": "Task status info",
     "status_name": "Assigned",
     "is_apply_task": false,
     "task_dropdown_xpath": "//span[text()='Task']",
     "task_option_name": "EXCAVATION DRAIN FIELD REPAIR",
-
     "_comment_date": "Date format: 10-12-2023",
     "start_date": "",
-
     "_comment_time": "Time format: 01:10 AM",
     "start_time": "",
-
     "apply_button_xpath": ".plot-map-button:has-text('Apply')",
     "locator_status_xpath": "//div[contains(@class, 'header-text')][last()]/div[last()]",
     "status_xpath": [
@@ -53,12 +49,20 @@
         "xpath": "//div[@class='filter-name' and normalize-space(text())='Scheduled Date']"
       },
       {
+        "action": "wait",
+        "timeout": 1000
+      },
+      {
         "action": "click",
         "xpath": "//li[@id='vs2__option-2']"
       },
       {
+        "action": "wait",
+        "timeout": 1500
+      },
+      {
         "action": "click",
-        "xpath": "//div[@class='secondary-filter box undefined undefined  short date-filter']//button[@class='button_JdBxs confirm_hsagT base-button']"
+        "xpath": "//div[contains(@class, 'date-filter')]//button[contains(text(), 'Confirm') or contains(@class, 'confirm')]"
       }
     ],
     "submit_filter": [
