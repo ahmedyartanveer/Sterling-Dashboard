@@ -12,7 +12,7 @@ class WorkOrderToday(models.Model):
 
     # Basic Information
     scheduled_date = models.DateTimeField(null=True, blank=True, help_text="Date the work is scheduled")
-    completed_date = models.DateTimeField(null=True, blank=True, help_text="Date the work is scheduled")
+    completed_date = models.CharField(max_length=100, null=True, blank=True, help_text="Date the work is Completed")
     elapsed_time = models.DateTimeField(max_length=50, null=True, blank=True, help_text="Time elapsed as a string")
     technician = models.CharField(max_length=255, null=True, blank=True, help_text="Name or ID of the technician")
     wo_number = models.CharField(max_length=100, null=True, blank=True, help_text="Work Order Number")
