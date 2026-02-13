@@ -187,18 +187,64 @@ class APIClient:
     
     def insert_work_order_today(self, work_order_data):
         """
-        Insert a single work order for today.
-        
+        Insert or update a single work order for today.
+
         Args:
             work_order_data: Dictionary containing work order details
-            
+
         Returns:
-            bool: True if insertion successful, False otherwise
+            bool: True if successful, False otherwise
         """
-        return self.manage_work_orders(
-            method_type="POST",
-            data=work_order_data
-        ) is not None
+
+        wo_number = work_order_data.get("wo_number")
+
+        if not wo_number:
+            print("wo_number is required.")
+            return False
+
+        # Step 1: Check if work order exists
+        result = self.manage_work_orders(
+            method_type="GET",
+            params={"wo_number": wo_number}
+        )
+
+        # If API returns list of results
+        if result and isinstance(result, list) and len(result) > 0:
+            existing_record = result[0]
+            record_id = existing_record.get("id")
+
+            if not record_id:
+                print("Record ID not found in response.")
+                return False
+
+            # Step 2: Update existing record
+            update_result = self.manage_work_orders(
+                method_type="PATCH",
+                record_id=record_id,
+                data=work_order_data
+            )
+
+            if update_result is not None:
+                print("Work order updated successfully.")
+                return True
+            else:
+                print("Failed to update work order.")
+                return False
+
+        else:
+            # Step 3: Create new record
+            create_result = self.manage_work_orders(
+                method_type="POST",
+                data=work_order_data
+            )
+
+            if create_result is not None:
+                print("Work order created successfully.")
+                return True
+            else:
+                print("Failed to create work order.")
+                return False
+
     
     def manage_work_orders(self, method_type, data=None, record_id=None, params=None):
         """
