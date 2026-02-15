@@ -803,6 +803,7 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
             full_address = work_order.get("full_address")
             wait_to_lock = work_order.get("wait_to_lock", False)
             rme_completed = work_order.get("rme_completed", False)
+            status = work_order.get("status")
 
             # ── Validation ─────────────────────────────────────────────────
             if not full_address:
@@ -810,7 +811,16 @@ class OnlineRMEScraper(BaseScraper, OnlineRMEEditTaskHelper):
                 result["error"] = "No address provided"
                 return result
 
-            # EARLY EXIT: already finalized - but still update status if needed
+            # EARLY EXIT: already finalized with LOCKED or DELETED status - no need to check anything
+            if rme_completed and status in ["LOCKED", "DELETED"]:
+                print(f"⏭️  Work order already finalized (rme_completed=True, status={status})")
+                print(f"   Address: {full_address}")
+                print(f"   Skipping all checks - no changes needed.")
+                result["status"] = status
+                result["rme_completed"] = True
+                return result
+
+            # EARLY EXIT: already completed but status might need verification
             if rme_completed:
                 print(f"⏭️  Work order already completed (rme_completed=True)")
                 print(f"   Address: {full_address}")
