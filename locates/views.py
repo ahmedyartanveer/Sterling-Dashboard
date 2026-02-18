@@ -21,6 +21,7 @@ from .serializers import (
     WorkOrderTodayEditSerializer
 )
 import subprocess, os, sys, json
+from automation.main import start_scraping
 
 
 
@@ -87,6 +88,30 @@ class WorkOrderTodayViewSet(viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
+    
+    @action(detail=False, methods=['post'], url_path='start-scraping', permission_classes=[IsAuthenticated])
+    def trigger_scraping(self, request):
+        """
+        Custom action to trigger scraping from WorkOrderToday endpoint
+        """
+        try:
+            start_scraping()
+            return Response(
+                {
+                    'status': 'success',
+                    'message': 'Scraping started successfully'
+                },
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {
+                    'status': 'error',
+                    'message': str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     
     @action(detail=False, methods=['post'], url_path='mark-seen', permission_classes=[IsAuthenticated])
     def bulk_mark_seen(self, request):
