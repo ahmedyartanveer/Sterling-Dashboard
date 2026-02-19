@@ -16,6 +16,7 @@ class WorkOrderToday(models.Model):
     elapsed_time = models.DateTimeField(max_length=50, null=True, blank=True, help_text="Time elapsed as a string")
     technician = models.CharField(max_length=255, null=True, blank=True, help_text="Name or ID of the technician")
     wo_number = models.CharField(max_length=100, null=True, blank=True, help_text="Work Order Number")
+    customer = models.CharField(max_length=255, null=True, blank=True, help_text="Customer name")
     
     # Address field can be long, so TextField is safer
     full_address = models.TextField(null=True, blank=True, help_text="Full address of the location")
