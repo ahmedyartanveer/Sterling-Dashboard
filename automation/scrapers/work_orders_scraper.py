@@ -5,7 +5,7 @@ Updated to include Add Column functionality for Completed Date.
 """
 import copy
 from typing import List, Dict, Optional
-
+import asyncio
 from automation.scrapers.base_scraper import BaseScraper
 
 
@@ -88,89 +88,6 @@ class WorkOrdersScraper(BaseScraper):
             print(f"Error during table scraping: {e}")
             return {'rows': []}
     
-    async def add_completed_date_column(self):
-        """
-        Add the Completed Date column to the table view.
-        Clicks Add Column button, selects Completed Date, and saves.
-        """
-        try:
-            # Click the Add Column button
-            print("Clicking Add Column button...")
-            add_column_xpath = '//div[@class="add-column-container list-layout-add-column-btn"]'
-            await self.page.wait_for_selector(f'xpath={add_column_xpath}', timeout=10000)
-            await self.page.click(f'xpath={add_column_xpath}')
-            
-            # Wait for the modal to appear
-            print("Waiting for Add Column modal...")
-            await self.page.wait_for_selector('.add-filter-container', state='visible', timeout=10000)
-            
-            # Wait a moment for the modal to fully load
-            await self.page.wait_for_timeout(1000)
-            
-            # Check if "Completed Date" is already in the selected columns
-            print("Checking if Completed Date is already selected...")
-            completed_already_selected = await self.page.evaluate(r"""() => {
-                const selectedContainer = document.querySelector('.selected-elements-container');
-                if (!selectedContainer) return false;
-                const elements = selectedContainer.querySelectorAll('.filter-element');
-                for (let elem of elements) {
-                    if (elem.textContent.includes('Completed Date')) {
-                        return true;
-                    }
-                }
-                return false;
-            }""")
-            
-            if completed_already_selected:
-                print("Completed Date is already selected in the table")
-                # Close the modal by clicking Cancel
-                cancel_button_xpath = '//button[contains(@class, "default_mVTtc")]//span[text()="Cancel"]'
-                await self.page.click(f'xpath={cancel_button_xpath}')
-                await self.page.wait_for_timeout(1000)
-                return True
-            
-            # Click on "Completed Date" checkbox in Available Columns
-            print("Selecting Completed Date from available columns...")
-            completed_date_label_xpath = '//label[@for="CompletedDatelabel"]'
-            await self.page.wait_for_selector(f'xpath={completed_date_label_xpath}', timeout=10000)
-            await self.page.click(f'xpath={completed_date_label_xpath}')
-            
-            # Wait for the checkbox to be checked and Save button to become enabled
-            print("Waiting for Save button to be enabled...")
-            await self.page.wait_for_timeout(1500)
-            
-            # Click Save button using JavaScript since it's in a modal
-            print("Clicking Save button...")
-            save_clicked = await self.page.evaluate(r"""() => {
-                // Find all buttons with confirm class
-                const buttons = document.querySelectorAll('button.confirm_hsagT');
-                for (let button of buttons) {
-                    // Check if button is visible and not disabled
-                    const rect = button.getBoundingClientRect();
-                    const isVisible = rect.width > 0 && rect.height > 0;
-                    const isNotDisabled = !button.hasAttribute('disabled');
-                    
-                    if (isVisible && isNotDisabled && button.textContent.includes('Save')) {
-                        button.click();
-                        return true;
-                    }
-                }
-                return false;
-            }""")
-            
-            if not save_clicked:
-                raise Exception("Could not find and click the Save button")
-            
-            # Wait for modal to close and table to update
-            print("Waiting for table to update...")
-            await self.page.wait_for_timeout(3000)
-            
-            print("✓ Completed Date column added successfully")
-            return True
-            
-        except Exception as e:
-            print(f"Error adding Completed Date column: {e}")
-            return False
     
     async def scrape_address_from_page(self, page):
         """
@@ -323,18 +240,17 @@ class WorkOrdersScraper(BaseScraper):
                 print(f"Error waiting for table: {e}")
                 return None
             
+
             # Apply filters
+            await self.perform_actions_by_xpaths(name="edit_filter_xpath")
+            await asyncio.sleep(3)  # Small delay to ensure filter UI is ready
             await self.perform_actions_by_xpaths(name="status_xpath")
-            await self.perform_actions_by_xpaths(name='scheduled_date_filter_xpath')
+            await self.perform_actions_by_xpaths(name='completed_date_filter_xpath')
             
             # NOTE: Do NOT click Apply button here - as per requirement
             # await self.perform_actions_by_xpaths(name='submit_filter')
             print("Filters set but NOT applied (as per requirement)")
             
-            # Add Completed Date column
-            column_added = await self.add_completed_date_column()
-            if not column_added:
-                print("Warning: Failed to add Completed Date column, continuing anyway...")
             
             # Wait for table to reload with new column
             await self.page.wait_for_timeout(3000)

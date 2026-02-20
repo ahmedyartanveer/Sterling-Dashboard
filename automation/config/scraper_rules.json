@@ -25,6 +25,20 @@
     "start_time": "",
     "apply_button_xpath": ".plot-map-button:has-text('Apply')",
     "locator_status_xpath": "//div[contains(@class, 'header-text')][last()]/div[last()]",
+    "edit_filter_xpath": [
+      {
+        "action": "click",
+        "xpath": "//button[@class='bttn-with-icon add-filter-button']"
+      },
+      {
+        "action": "click",
+        "xpath": "//*[@id='CompletedDatelabel']"
+      },
+      {
+        "action": "click",
+        "xpath": "(//div[@class='add-filter-container']//button)[last()]"
+      }
+    ],
     "status_xpath": [
       {
         "action": "click",
@@ -40,13 +54,17 @@
       },
       {
         "action": "click",
+        "xpath": "//input[@id='selected_0_5']"
+      },
+      {
+        "action": "click",
         "xpath": "//div[@class='secondary-filter box undefined undefined  class-selected multiple']//button[@class='button_JdBxs confirm_hsagT base-button']"
       }
     ],
-    "scheduled_date_filter_xpath": [
+    "completed_date_filter_xpath": [
       {
         "action": "click",
-        "xpath": "//div[@class='filter-name' and normalize-space(text())='Scheduled Date']"
+        "xpath": "//div[@class='filter-name' and normalize-space(text())='Completed Date']"
       },
       {
         "action": "wait",
@@ -54,7 +72,7 @@
       },
       {
         "action": "click",
-        "xpath": "//li[@id='vs2__option-2']"
+        "xpath": "//li[@id='vs3__option-2']"
       },
       {
         "action": "wait",
@@ -62,7 +80,7 @@
       },
       {
         "action": "click",
-        "xpath": "//div[contains(@class, 'date-filter')]//button[contains(text(), 'Confirm') or contains(@class, 'confirm')]"
+        "xpath": "//*[@id='settings-sub-menu-id']/div[2]/div[9]/div/div[11]/div[3]/div/div[3]/div/div/button[2]"
       }
     ],
     "submit_filter": [
