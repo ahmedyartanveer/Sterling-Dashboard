@@ -70,7 +70,7 @@ async def run_online_rme_scraper():
         # Fetch records that need URL updates
         work_orders_missing_urls = scraper.api_client.manage_work_orders(
             method_type="GET", 
-            params='is_deleted=false&status=LOCKED,DELETE'
+            params='is_deleted=false'
         )
 
         record_count = len(work_orders_missing_urls) if work_orders_missing_urls else 0
